@@ -1,0 +1,17 @@
+# Local credentials; publish placeholders separately when configuration is added.
+.env
+.env.*
+!.env.example
+
+# Personal records and attachments; fictional fixtures belong in source resources.
+/private/
+/data/
+/uploads/
+/backups/
+
+# Java build output and local logs.
+target/
+build/
+.gradle/
+*.class
+*.log
