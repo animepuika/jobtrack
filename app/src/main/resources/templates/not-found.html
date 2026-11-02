@@ -3,10 +3,12 @@
 <head th:replace="~{fragments :: head('Not found')}"></head>
 <body>
 <header th:replace="~{fragments :: header}"></header>
-<main class="narrow">
-	<h1>Not found</h1>
-	<p>That application does not exist, or it is not yours.</p>
-	<p><a th:href="@{/}">Back to your applications</a></p>
+<main id="main" class="narrow-sm">
+	<p class="eyebrow">Not found</p>
+	<h1>We can't find that application</h1>
+	<p class="lead">The link may be mistyped, or the application isn't in your
+		account. Archived jobs are still here; turn on Show archived on the dashboard to see them.</p>
+	<a class="button primary" th:href="@{/}"><svg th:replace="~{fragments :: icon-back}"></svg>Back to your applications</a>
 </main>
 </body>
 </html>

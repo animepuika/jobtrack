@@ -3,97 +3,148 @@
 <head th:replace="~{fragments :: head(${job.title})}"></head>
 <body>
 <header th:replace="~{fragments :: header}"></header>
-<main>
+<main id="main">
+	<a class="back-link" th:href="@{/}"><svg th:replace="~{fragments :: icon-back}"></svg>All applications</a>
 	<div th:replace="~{fragments :: flash}"></div>
-	<p><a th:href="@{/}">← All applications</a></p>
+
+	<form th:if="${jobApplication.archived}" th:action="@{/applications/{id}/restore(id=${jobApplication.id})}"
+		method="post" class="flash archived">
+		<svg th:replace="~{fragments :: icon-archive}"></svg>
+		<span class="flash-body"><strong>This application is archived.</strong> It's hidden from your dashboard unless
+			you show archived jobs. Nothing is deleted.</span>
+		<button type="submit">Restore</button>
+	</form>
 
 	<div class="page-title">
 		<div>
 			<h1 th:text="${job.title}">Junior Java Developer</h1>
 			<p class="subtitle">
-				<span th:text="${job.company}">Example Logistics</span>
-				<span th:if="${job.location}"> · <span th:text="${job.location}">Riga</span></span>
+				<span th:text="${job.company}">Example Logistics</span><span th:if="${job.location}"
+					th:text="' · ' + ${job.location}"> · Riga</span>
 			</p>
+			<div class="headline-meta">
+				<span th:replace="~{fragments :: stage(${jobApplication.stage})}"></span>
+				<span class="updated">Updated <time th:datetime="${updatedOn}" th:text="${#temporals.format(updatedOn, 'd MMM yyyy')}">2 Nov 2026</time></span>
+				<a th:if="${job.sourceUrl}" th:href="${job.sourceUrl}" target="_blank" rel="noopener noreferrer">Open listing<svg
+					th:replace="~{fragments :: icon-external}"></svg><span class="visually-hidden">(opens in a new tab)</span></a>
+			</div>
 		</div>
-		<div class="actions">
-			<span th:replace="~{fragments :: stage(${jobApplication.stage})}"></span>
-			<a class="button" th:href="@{/applications/{id}/edit(id=${jobApplication.id})}">Edit</a>
-		</div>
+		<a class="button" th:href="@{/applications/{id}/edit(id=${jobApplication.id})}"><svg th:replace="~{fragments :: icon-edit}"></svg>Edit details</a>
 	</div>
 
 	<div class="columns">
-		<section class="main-column">
-			<div class="card" aria-labelledby="progress-heading">
+		<div class="main-column">
+			<section class="card" aria-labelledby="progress-heading">
 				<h2 id="progress-heading">Progress</h2>
-				<p th:if="${jobApplication.stage.isFinal()}" class="muted">
-					This application is <strong th:text="${jobApplication.stage.label}">Accepted</strong>. That is a final
-					stage, so it cannot move any further.
-				</p>
-				<form th:unless="${jobApplication.stage.isFinal()}" th:action="@{/applications/{id}/stage(id=${jobApplication.id})}"
-					method="post" class="inline-form">
-					<label>Move to
-						<select name="stage" required>
-							<option th:each="s : ${jobApplication.stage.nextStages()}" th:value="${s}" th:text="${s.label}">Applied</option>
-						</select>
-					</label>
-					<label>On
-						<input type="date" name="date" th:value="${today}" th:max="${today}" required>
-					</label>
-					<button type="submit" class="primary">Update stage</button>
-				</form>
-			</div>
+				<ol class="stepper" aria-label="Stages so far">
+					<li th:each="step : ${steps}" th:classappend="${step.status() != 'todo'} ? ${step.status()}"
+						th:attr="aria-current=${step.status() == 'current' or step.status() == 'end'} ? 'step'">
+						<span class="label" th:text="${step.stage().label}">Saved</span>
+						<time th:if="${step.reached()}" th:datetime="${step.reached()}"
+							th:text="${#temporals.format(step.reached(), 'd MMM')}">2 Nov</time>
+					</li>
+				</ol>
 
-			<div class="card" aria-labelledby="note-heading">
-				<h2 id="note-heading">Add a note</h2>
-				<form th:action="@{/applications/{id}/notes(id=${jobApplication.id})}" method="post" class="stack">
-					<label class="visually-hidden" for="note-text">Note</label>
-					<textarea id="note-text" name="text" rows="3" maxlength="5000" required
-						placeholder="Interview questions, contacts, what to follow up on…"></textarea>
+				<form th:unless="${jobApplication.stage.isFinal()}" class="move"
+					th:action="@{/applications/{id}/stage(id=${jobApplication.id})}" method="post">
+					<fieldset>
+						<legend>Move to</legend>
+						<div class="move-options">
+							<label class="move-option" th:each="s : ${jobApplication.stage.nextStages()}">
+								<input type="radio" name="stage" th:value="${s}" required>
+								<span>
+									<span th:replace="~{fragments :: stage(${s})}"></span>
+									<span class="help" th:text="${moveHelp.get(s)}">You sent your application</span>
+								</span>
+							</label>
+						</div>
+					</fieldset>
 					<div class="inline-form">
-						<label>Date <input type="date" name="date" th:value="${today}"></label>
-						<button type="submit">Add note</button>
+						<div class="field">
+							<label for="stage-date">Date</label>
+							<input id="stage-date" type="date" name="date" th:value="${today}" th:max="${today}" required
+								aria-describedby="stage-date-hint">
+						</div>
+						<button type="submit" class="primary">Update stage</button>
+						<span id="stage-date-hint" class="hint">Today by default. It can't be later than today.</span>
 					</div>
 				</form>
-			</div>
+				<div th:if="${jobApplication.stage.isFinal()}" class="final-note">
+					<svg th:replace="~{fragments :: icon-info}"></svg>
+					<p><strong>No more moves.</strong> <span th:text="${jobApplication.stage.label}">Rejected</span> is a final
+						stage, so this application can't move again. You can still add notes, or archive it to keep your
+						dashboard short.</p>
+				</div>
+			</section>
 
-			<div class="card" aria-labelledby="history-heading">
-				<h2 id="history-heading">History</h2>
+			<section class="card" aria-labelledby="note-heading">
+				<h2 id="note-heading">Add a note</h2>
+				<form th:action="@{/applications/{id}/notes(id=${jobApplication.id})}" method="post" class="stack">
+					<div class="field">
+						<label for="note-text">Note</label>
+						<textarea id="note-text" name="text" rows="3" maxlength="5000" required aria-describedby="note-hint"
+							placeholder="Interview questions, contacts, what to follow up on"></textarea>
+					</div>
+					<div class="inline-form">
+						<div class="field">
+							<label for="note-date">Date</label>
+							<input id="note-date" type="date" name="date" th:value="${today}" th:max="${today}">
+						</div>
+						<button type="submit">Add note</button>
+						<span id="note-hint" class="hint">Notes join the history and can't be edited later.</span>
+					</div>
+				</form>
+			</section>
+
+			<section class="card" aria-labelledby="history-heading">
+				<h2 id="history-heading">History <span class="hint">newest first</span></h2>
 				<ol class="timeline">
 					<li th:each="e : ${history}" th:classappend="'event-' + ${#strings.toLowerCase(e.type.name())}">
-						<time th:datetime="${e.occurredOn}" th:text="${#temporals.format(e.occurredOn, 'd MMM yyyy')}">1 Nov 2026</time>
-						<div th:switch="${e.type.name()}">
-							<p th:case="'CREATED'">Saved to the tracker</p>
-							<p th:case="'STAGE_CHANGE'">
-								<span th:text="${e.fromStage.label}">Saved</span> → <strong th:text="${e.toStage.label}">Applied</strong>
+						<span class="marker" aria-hidden="true" th:switch="${e.type.name()}">
+							<th:block th:case="'CREATED'"><svg th:replace="~{fragments :: icon-plus}"></svg></th:block>
+							<th:block th:case="'STAGE_CHANGE'"><svg th:replace="~{fragments :: icon-arrow}"></svg></th:block>
+							<th:block th:case="'NOTE'"><svg th:replace="~{fragments :: icon-note}"></svg></th:block>
+						</span>
+						<div>
+							<p class="meta">
+								<span th:text="${e.type.name() == 'CREATED'} ? 'Saved' : (${e.type.name() == 'NOTE'} ? 'Note' : 'Stage changed')">Note</span>
+								<span aria-hidden="true">·</span>
+								<time th:datetime="${e.occurredOn}" th:text="${#temporals.format(e.occurredOn, 'd MMM yyyy')}">2 Nov 2026</time>
 							</p>
-							<p th:case="'NOTE'" class="note" th:text="${e.note}">Note text</p>
+							<p th:if="${e.type.name() == 'STAGE_CHANGE'}" class="change">
+								<span th:replace="~{fragments :: stage(${e.fromStage})}"></span>
+								<span class="visually-hidden">to</span><svg th:replace="~{fragments :: icon-arrow}"></svg>
+								<span th:replace="~{fragments :: stage(${e.toStage})}"></span>
+							</p>
+							<p th:if="${e.type.name() == 'NOTE'}" class="note" th:text="${e.note}">Note text</p>
+							<p th:if="${e.type.name() == 'CREATED'}" class="subtitle"
+								th:text="${job.sourceProvider.name() == 'HIRINGCAFE'} ? 'Started tracking. Saved from HiringCafe.' : 'Started tracking. Added by hand.'">Started tracking.</p>
 						</div>
 					</li>
 				</ol>
-			</div>
-		</section>
+			</section>
+		</div>
 
 		<aside class="side-column">
-			<div class="card">
-				<h2>Details</h2>
-				<dl>
+			<section class="card" aria-labelledby="details-heading">
+				<h2 id="details-heading">Details</h2>
+				<dl class="details">
+					<dt>Company</dt>
+					<dd th:text="${job.company}">Example Logistics</dd>
+					<dt>Location</dt>
+					<dd th:text="${job.location} ?: 'Not given'">Riga</dd>
 					<dt>Source</dt>
 					<dd th:text="${job.sourceProvider.name() == 'HIRINGCAFE'} ? 'HiringCafe' : 'Added by hand'">Added by hand</dd>
-					<dt>Listing</dt>
-					<dd>
-						<a th:if="${job.sourceUrl}" th:href="${job.sourceUrl}" rel="noopener noreferrer" target="_blank">Open listing</a>
-						<span th:unless="${job.sourceUrl}" class="muted">No link</span>
-					</dd>
+					<dt>Saved on</dt>
+					<dd th:text="${savedOn} ? ${#temporals.format(savedOn, 'd MMM yyyy')} : '—'">2 Nov 2026</dd>
 					<dt>Applied on</dt>
 					<dd th:text="${jobApplication.appliedOn} ? ${#temporals.format(jobApplication.appliedOn, 'd MMM yyyy')} : 'Not yet'">Not yet</dd>
 				</dl>
-			</div>
-			<form th:if="${!jobApplication.archived}" th:action="@{/applications/{id}/archive(id=${jobApplication.id})}" method="post">
-				<button type="submit" class="subtle">Archive</button>
-			</form>
-			<form th:if="${jobApplication.archived}" th:action="@{/applications/{id}/restore(id=${jobApplication.id})}" method="post">
-				<p class="muted">This application is archived.</p>
-				<button type="submit">Restore</button>
+			</section>
+			<form th:unless="${jobApplication.archived}" class="archive-box"
+				th:action="@{/applications/{id}/archive(id=${jobApplication.id})}" method="post">
+				<button type="submit" class="archive"><svg th:replace="~{fragments :: icon-archive}"></svg>Archive</button>
+				<p>Hides it from your dashboard. Nothing is deleted, and you can restore it any time.</p>
 			</form>
 		</aside>
 	</div>

@@ -3,73 +3,110 @@
 <head th:replace="~{fragments :: head('Search jobs')}"></head>
 <body>
 <header th:replace="~{fragments :: header}"></header>
-<main>
+<main id="main">
 	<div th:replace="~{fragments :: flash}"></div>
 	<h1>Search HiringCafe</h1>
+	<p class="lead">HiringCafe is a job search service. Results are only shown here; nothing is saved until you choose Track.</p>
 
-	<div th:unless="${searchEnabled}" class="card">
-		<p>Live job search is turned off here. You can still <a th:href="@{/applications/new}">add jobs by hand</a>.</p>
+	<div th:unless="${searchEnabled}" class="card narrow-card">
+		<h2><svg th:replace="~{fragments :: icon-info}"></svg> Live search is turned off here</h2>
+		<p class="empty-text">This JobTrack doesn't contact HiringCafe. Everything else works: add a job by hand and
+			move it through the stages.</p>
+		<a class="button primary" th:href="@{/applications/new}"><svg th:replace="~{fragments :: icon-plus}"></svg>Add a job by hand</a>
 	</div>
 
-	<form th:if="${searchEnabled}" th:action="@{/search}" method="get" class="card filters">
-		<label>Keywords
-			<input type="search" name="keywords" th:value="${keywords}" placeholder="Java developer" required>
-		</label>
-		<label>Location
-			<input type="text" name="location" th:value="${location}" placeholder="Latvia">
-		</label>
-		<label>Workplace
-			<select name="workplace">
-				<option value="">Any</option>
-				<option th:each="w : ${workplaces}" th:value="${w}" th:text="${w.label()}" th:selected="${w == workplace}">Remote</option>
-			</select>
-		</label>
-		<label>Seniority
-			<select name="seniority">
-				<option value="">Any</option>
-				<option th:each="s : ${seniorities}" th:value="${s}" th:text="${s.label()}" th:selected="${s == seniority}">Entry Level</option>
-			</select>
-		</label>
-		<button type="submit" class="primary">Search</button>
+	<form th:if="${searchEnabled}" id="search-form" th:action="@{/search}" method="get" class="card search-form"
+		role="search" aria-label="Search HiringCafe">
+		<div class="field keywords">
+			<label for="keywords">Keywords <span class="required">(required)</span></label>
+			<input id="keywords" type="search" name="keywords" th:value="${keywords}" placeholder="Junior Java developer" required>
+		</div>
+		<div class="field location">
+			<label for="location">Location <span class="optional">(optional)</span></label>
+			<input id="location" type="text" name="location" th:value="${location}" placeholder="Riga">
+		</div>
+		<fieldset>
+			<legend>Workplace</legend>
+			<div class="choice-row">
+				<label class="choice"><input type="radio" name="workplace" value="" th:checked="${workplace == null}"> Any</label>
+				<label class="choice" th:each="w : ${workplaces}"><input type="radio" name="workplace" th:value="${w}"
+					th:checked="${w == workplace}"> <span th:text="${w.label()}">Remote</span></label>
+			</div>
+		</fieldset>
+		<fieldset>
+			<legend>Seniority</legend>
+			<div class="choice-row">
+				<label class="choice"><input type="radio" name="seniority" value="" th:checked="${seniority == null}"> Any</label>
+				<label class="choice" th:each="s : ${seniorities}"><input type="radio" name="seniority" th:value="${s}"
+					th:checked="${s == seniority}"> <span th:text="${s.shortLabel()}">Entry</span></label>
+			</div>
+		</fieldset>
+		<button type="submit" class="primary"><svg th:replace="~{fragments :: icon-search}"></svg>Search</button>
 	</form>
 
-	<div th:if="${searchError}" class="flash error" role="alert">
-		<p th:text="${searchError}">HiringCafe did not respond in time</p>
-		<p th:if="${retryAfterSeconds}">HiringCafe asked to wait <span th:text="${retryAfterSeconds}">30</span> seconds.</p>
-		<p>Your tracker still works. You can <a th:href="@{/applications/new}">add the job by hand</a>.</p>
+	<div th:if="${searchEnabled and (keywords == null or keywords.isBlank())}" class="empty narrow-card">
+		<p class="empty-title">Start with a few keywords</p>
+		<p class="empty-text">A job title or a skill works best, like “junior java developer”. Location, workplace and
+			seniority narrow it down. You'll see up to 10 results at a time.</p>
+		<p>Found a job somewhere else? <a th:href="@{/applications/new}">Add it by hand</a></p>
+	</div>
+
+	<div th:if="${searchError}" class="flash warn" role="alert" tabindex="-1">
+		<svg th:replace="~{fragments :: icon-clock}"></svg>
+		<div class="flash-body">
+			<p class="flash-title" th:if="${retryAfterSeconds}">HiringCafe asked to wait <span th:text="${retryAfterSeconds}">30</span> seconds</p>
+			<p class="flash-title" th:unless="${retryAfterSeconds}">Search isn't available right now</p>
+			<p th:text="${searchError}">HiringCafe could not be reached.</p>
+			<p>Your search is kept above, so you can try again in a moment. Your tracker still works, and you can add the
+				job by hand now.</p>
+			<div class="actions">
+				<button type="submit" form="search-form">Try again</button>
+				<a class="button subtle" th:href="@{/applications/new}">Add a job by hand</a>
+			</div>
+		</div>
 	</div>
 
 	<section th:if="${page}" aria-labelledby="results-heading">
-		<h2 id="results-heading">
-			Showing <span th:text="${page.results().size()}">3</span> of <span th:text="${page.total()}">33</span> matches
-		</h2>
-		<p class="muted">Results come straight from HiringCafe and are not saved until you track one. HiringCafe's
-			location filter is broad, so check each place.</p>
-		<p th:if="${page.results().isEmpty()}" class="empty">No jobs found. Try fewer or different words.</p>
-
-		<ul class="results">
-			<li th:each="r : ${page.results()}" class="card result">
-				<div>
-					<h3><a th:href="${r.url()}" th:text="${r.title()}" rel="noopener noreferrer" target="_blank">Junior Java Developer</a></h3>
-					<p class="subtitle" th:text="${r.company()}">Example Logistics</p>
-					<ul class="chips">
+		<th:block th:if="${page.results().isEmpty()}">
+			<h2 id="results-heading">No matches</h2>
+			<div class="empty narrow-card">
+				<p class="empty-title">HiringCafe found nothing for “<span th:text="${keywords}">cobol</span>”<span
+					th:if="${location}" th:text="' near ' + ${location}"> near Riga</span></p>
+				<p class="empty-text">Try fewer or broader words, or set Workplace and Seniority back to Any.</p>
+				<a class="button" th:href="@{/applications/new}">Add a job by hand</a>
+			</div>
+		</th:block>
+		<th:block th:unless="${page.results().isEmpty()}">
+			<h2 id="results-heading" tabindex="-1">Showing <span th:text="${page.results().size()}">10</span> of
+				<span th:text="${page.total()}">33</span> matches</h2>
+			<p class="hint results-hint">HiringCafe's location filter is broad, so check the place on each result. Narrow
+				your keywords to see different matches.</p>
+			<ul class="results">
+				<li th:each="r : ${page.results()}" class="result">
+					<div>
+						<h3><a th:href="${r.url()}" target="_blank" rel="noopener noreferrer"><span th:text="${r.title()}">Junior Java Developer</span><svg
+							th:replace="~{fragments :: icon-external}"></svg><span class="visually-hidden">(opens in a new tab)</span></a></h3>
+						<p class="subtitle" th:text="${r.company()}">Example Logistics</p>
+					</div>
+					<ul class="chips" aria-label="Highlights">
 						<li th:each="h : ${r.highlights()}" th:text="${h}">Riga · Hybrid</li>
 					</ul>
-				</div>
-				<div class="result-action">
-					<a th:if="${tracked[r.externalId()]}" class="button"
-						th:href="@{/applications/{id}(id=${tracked[r.externalId()]})}">Tracked · open</a>
-					<form th:unless="${tracked[r.externalId()]}" th:action="@{/search/track}" method="post">
-						<input type="hidden" name="externalId" th:value="${r.externalId()}">
-						<input type="hidden" name="title" th:value="${r.title()}">
-						<input type="hidden" name="company" th:value="${r.company()}">
-						<input type="hidden" name="location" th:value="${r.location()}">
-						<input type="hidden" name="url" th:value="${r.url()}">
-						<button type="submit" class="primary">Track</button>
-					</form>
-				</div>
-			</li>
-		</ul>
+					<div class="result-action">
+						<a th:if="${tracked[r.externalId()]}" class="button tracked"
+							th:href="@{/applications/{id}(id=${tracked[r.externalId()]})}"><svg th:replace="~{fragments :: icon-check}"></svg>Tracked · open</a>
+						<form th:unless="${tracked[r.externalId()]}" th:action="@{/search/track}" method="post">
+							<input type="hidden" name="externalId" th:value="${r.externalId()}">
+							<input type="hidden" name="title" th:value="${r.title()}">
+							<input type="hidden" name="company" th:value="${r.company()}">
+							<input type="hidden" name="location" th:value="${r.location()}">
+							<input type="hidden" name="url" th:value="${r.url()}">
+							<button type="submit"><svg th:replace="~{fragments :: icon-plus}"></svg>Track</button>
+						</form>
+					</div>
+				</li>
+			</ul>
+			<p class="after-results">Not here? <a th:href="@{/applications/new}">Add a job by hand</a></p>
+		</th:block>
 	</section>
 </main>
 </body>

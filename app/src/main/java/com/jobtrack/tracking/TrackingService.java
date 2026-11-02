@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,9 +67,38 @@ public class TrackingService {
 
 	@Transactional(readOnly = true)
 	public List<JobApplication> list(long ownerId, ApplicationFilter filter) {
-		String pattern = (filter.text() == null || filter.text().isBlank()) ? null
+		return this.applications.search(ownerId, filter.stage(), pattern(filter), filter.includeArchived());
+	}
+
+	/**
+	 * One page of the filtered list, newest change first. {@code page} counts from 0;
+	 * a page past the end returns the last page instead.
+	 */
+	@Transactional(readOnly = true)
+	public Page<JobApplication> listPage(long ownerId, ApplicationFilter filter, int page, int size) {
+		Page<JobApplication> result = searchPage(ownerId, filter, Math.max(page, 0), size);
+		if (result.getTotalPages() > 0 && result.getNumber() >= result.getTotalPages()) {
+			result = searchPage(ownerId, filter, result.getTotalPages() - 1, size);
+		}
+		return result;
+	}
+
+	/**
+	 * How many applications the user has, archived ones included.
+	 */
+	@Transactional(readOnly = true)
+	public long countAll(long ownerId) {
+		return this.applications.countByJobOwnerId(ownerId);
+	}
+
+	private Page<JobApplication> searchPage(long ownerId, ApplicationFilter filter, int page, int size) {
+		return this.applications.searchPage(ownerId, filter.stage(), pattern(filter), filter.includeArchived(),
+				PageRequest.of(page, size));
+	}
+
+	private static String pattern(ApplicationFilter filter) {
+		return (filter.text() == null || filter.text().isBlank()) ? null
 				: "%" + filter.text().strip().toLowerCase(Locale.ROOT) + "%";
-		return this.applications.search(ownerId, filter.stage(), pattern, filter.includeArchived());
 	}
 
 	@Transactional(readOnly = true)
@@ -80,7 +110,7 @@ public class TrackingService {
 	public JobApplication changeStage(long ownerId, long applicationId, Stage next, LocalDate on) {
 		LocalDate date = (on != null) ? on : today();
 		if (date.isAfter(today())) {
-			throw new IllegalArgumentException("A stage change cannot be dated in the future");
+			throw new IllegalArgumentException("The date can't be in the future.");
 		}
 		JobApplication application = findOwned(ownerId, applicationId);
 		application.moveTo(next, date, Instant.now(this.clock));

@@ -46,6 +46,7 @@ class SearchPageController {
 	String search(@AuthenticationPrincipal JobTrackUser user, @RequestParam(required = false) String keywords,
 			@RequestParam(required = false) String location, @RequestParam(required = false) Workplace workplace,
 			@RequestParam(required = false) Seniority seniority, Model model) {
+		model.addAttribute("nav", "search");
 		model.addAttribute("keywords", keywords);
 		model.addAttribute("location", location);
 		model.addAttribute("workplace", workplace);

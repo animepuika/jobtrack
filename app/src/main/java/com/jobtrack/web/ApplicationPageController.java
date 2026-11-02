@@ -1,11 +1,13 @@
 package com.jobtrack.web;
 
+import java.time.Clock;
 import java.time.LocalDate;
 
 import com.jobtrack.tracking.ApplicationDetails;
 import com.jobtrack.tracking.DuplicateJobException;
 import com.jobtrack.tracking.JobApplication;
 import com.jobtrack.tracking.NewJob;
+import com.jobtrack.tracking.SourceUrls;
 import com.jobtrack.tracking.Stage;
 import com.jobtrack.tracking.StageChangeNotAllowedException;
 import com.jobtrack.tracking.TrackedJob;
@@ -36,21 +38,25 @@ class ApplicationPageController {
 
 	private final TrackingService tracking;
 
-	ApplicationPageController(TrackingService tracking) {
+	private final Clock clock;
+
+	ApplicationPageController(TrackingService tracking, Clock clock) {
 		this.tracking = tracking;
+		this.clock = clock;
 	}
 
 	@GetMapping("/new")
 	String newJob(Model model) {
 		model.addAttribute("jobForm", new JobForm());
-		model.addAttribute("editing", false);
+		formPage(model, false, null);
 		return "application-form";
 	}
 
 	@PostMapping
 	String create(@AuthenticationPrincipal JobTrackUser user, @Valid @ModelAttribute("jobForm") JobForm form,
 			BindingResult result, Model model, RedirectAttributes redirect) {
-		model.addAttribute("editing", false);
+		formPage(model, false, null);
+		checkLink(form, result);
 		if (result.hasErrors()) {
 			return "application-form";
 		}
@@ -61,7 +67,9 @@ class ApplicationPageController {
 			return "redirect:/applications/" + application.getId();
 		}
 		catch (DuplicateJobException ex) {
-			model.addAttribute("duplicateId", ex.getExistingApplicationId());
+			ApplicationDetails existing = this.tracking.get(user.getId(), ex.getExistingApplicationId());
+			model.addAttribute("duplicate", existing.application());
+			model.addAttribute("duplicateSavedOn", StageProgress.savedOn(existing.history()));
 			return "application-form";
 		}
 		catch (IllegalArgumentException ex) {
@@ -73,9 +81,15 @@ class ApplicationPageController {
 	@GetMapping("/{id}")
 	String show(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id, Model model) {
 		ApplicationDetails details = this.tracking.get(user.getId(), id);
-		model.addAttribute("jobApplication", details.application());
-		model.addAttribute("job", details.application().getJob());
+		JobApplication application = details.application();
+		model.addAttribute("nav", "none");
+		model.addAttribute("jobApplication", application);
+		model.addAttribute("job", application.getJob());
 		model.addAttribute("history", details.history().reversed());
+		model.addAttribute("steps", StageProgress.of(application.getStage(), details.history()));
+		model.addAttribute("moveHelp", StageProgress.MOVE_HELP);
+		model.addAttribute("savedOn", StageProgress.savedOn(details.history()));
+		model.addAttribute("updatedOn", LocalDate.ofInstant(application.getUpdatedAt(), this.clock.getZone()));
 		model.addAttribute("today", this.tracking.today());
 		return "application-detail";
 	}
@@ -86,9 +100,13 @@ class ApplicationPageController {
 			RedirectAttributes redirect) {
 		try {
 			this.tracking.changeStage(user.getId(), id, stage, date);
-			redirect.addFlashAttribute("success", "Moved to " + stage.getLabel() + ".");
+			redirect.addFlashAttribute("success", "Moved to " + stage.getLabel() + ". The change is in the history below.");
 		}
-		catch (StageChangeNotAllowedException | IllegalArgumentException ex) {
+		catch (StageChangeNotAllowedException ex) {
+			redirect.addFlashAttribute("error", "That move isn't possible: this application is already at "
+					+ ex.getFrom().getLabel() + ", and stages only move forward. Nothing was changed.");
+		}
+		catch (IllegalArgumentException ex) {
 			redirect.addFlashAttribute("error", ex.getMessage());
 		}
 		return "redirect:/applications/" + id;
@@ -117,8 +135,8 @@ class ApplicationPageController {
 		form.setLocation(job.getLocation());
 		form.setSourceUrl(job.getSourceUrl());
 		model.addAttribute("jobForm", form);
-		model.addAttribute("editing", true);
-		model.addAttribute("applicationId", id);
+		formPage(model, true, id);
+		model.addAttribute("source", job.getSourceProvider());
 		return "application-form";
 	}
 
@@ -126,8 +144,10 @@ class ApplicationPageController {
 	String update(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id,
 			@Valid @ModelAttribute("jobForm") JobForm form, BindingResult result, Model model,
 			RedirectAttributes redirect) {
-		model.addAttribute("editing", true);
-		model.addAttribute("applicationId", id);
+		formPage(model, true, id);
+		TrackedJob job = this.tracking.get(user.getId(), id).application().getJob();
+		model.addAttribute("source", job.getSourceProvider());
+		form.setSourceUrl(job.getSourceUrl());
 		if (result.hasErrors()) {
 			return "application-form";
 		}
@@ -145,15 +165,34 @@ class ApplicationPageController {
 	@PostMapping("/{id}/archive")
 	String archive(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id, RedirectAttributes redirect) {
 		this.tracking.setArchived(user.getId(), id, true);
-		redirect.addFlashAttribute("success", "Archived. It is hidden from the dashboard unless you show archived jobs.");
+		redirect.addFlashAttribute("success",
+				"Archived. It's hidden from your dashboard unless you show archived jobs. Nothing is deleted.");
 		return "redirect:/applications/" + id;
 	}
 
 	@PostMapping("/{id}/restore")
 	String restore(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id, RedirectAttributes redirect) {
 		this.tracking.setArchived(user.getId(), id, false);
-		redirect.addFlashAttribute("success", "Restored to the dashboard.");
+		redirect.addFlashAttribute("success", "Restored. It's back on your dashboard.");
 		return "redirect:/applications/" + id;
+	}
+
+	private static void formPage(Model model, boolean editing, Long applicationId) {
+		model.addAttribute("nav", editing ? "none" : "add");
+		model.addAttribute("editing", editing);
+		model.addAttribute("applicationId", applicationId);
+	}
+
+	private static void checkLink(JobForm form, BindingResult result) {
+		if (result.hasFieldErrors("sourceUrl")) {
+			return;
+		}
+		try {
+			SourceUrls.normalize(form.getSourceUrl());
+		}
+		catch (IllegalArgumentException ex) {
+			result.rejectValue("sourceUrl", "invalid", "Enter the full link, starting with https://");
+		}
 	}
 
 }

@@ -3,91 +3,183 @@
 <head th:replace="~{fragments :: head('Dashboard')}"></head>
 <body>
 <header th:replace="~{fragments :: header}"></header>
-<main>
+<main id="main">
 	<div th:replace="~{fragments :: flash}"></div>
-	<div class="page-title">
-		<h1>Your applications</h1>
-		<div class="actions">
-			<a class="button primary" th:href="@{/applications/new}">Add job</a>
-			<a class="button" th:if="${searchEnabled}" th:href="@{/search}">Search HiringCafe</a>
-		</div>
-	</div>
 
-	<section aria-label="Applications by stage" class="stage-counts">
-		<a th:each="s : ${stages}" class="count" th:href="@{/(stage=${s})}"
-			th:classappend="${s == selectedStage} ? 'selected'">
-			<span class="number" th:text="${counts.get(s)}">0</span>
-			<span th:replace="~{fragments :: stage(${s})}"></span>
-		</a>
-	</section>
-
-	<div class="columns">
-		<section class="main-column" aria-labelledby="list-heading">
-			<h2 id="list-heading" class="visually-hidden">Application list</h2>
-			<form th:action="@{/}" method="get" class="filters">
-				<label>Search
-					<input type="search" name="q" th:value="${q}" placeholder="Title, company or place">
-				</label>
-				<label>Stage
-					<select name="stage">
-						<option value="">Any stage</option>
-						<option th:each="s : ${stages}" th:value="${s}" th:text="${s.label}"
-							th:selected="${s == selectedStage}">Saved</option>
-					</select>
-				</label>
-				<label class="checkbox">
-					<input type="checkbox" name="archived" value="true" th:checked="${archived}"> Show archived
-				</label>
-				<button type="submit">Filter</button>
-				<a th:if="${selectedStage != null or q != null or archived}" th:href="@{/}">Clear</a>
-			</form>
-
-			<p th:if="${applications.isEmpty()}" class="empty">
-				No applications match. <a th:href="@{/applications/new}">Add a job</a> to start tracking.
-			</p>
-
-			<table th:unless="${applications.isEmpty()}" class="applications">
-				<thead>
-				<tr>
-					<th scope="col">Job</th>
-					<th scope="col">Location</th>
-					<th scope="col">Stage</th>
-					<th scope="col">Updated</th>
-				</tr>
-				</thead>
-				<tbody>
-				<tr th:each="a : ${applications}" th:classappend="${a.archived} ? 'archived'">
-					<td>
-						<a th:href="@{/applications/{id}(id=${a.id})}" th:text="${a.job.title}">Junior Java Developer</a>
-						<div class="muted" th:text="${a.job.company}">Example Logistics</div>
-					</td>
-					<td th:text="${a.job.location} ?: '—'">Riga</td>
-					<td>
-						<span th:replace="~{fragments :: stage(${a.stage})}"></span>
-						<span th:if="${a.archived}" class="muted">archived</span>
-					</td>
-					<td class="muted" th:text="${#temporals.format(a.updatedAt.atZone(zone), 'd MMM yyyy')}">1 Nov 2026</td>
-				</tr>
-				</tbody>
-			</table>
-		</section>
-
-		<aside class="side-column" aria-labelledby="activity-heading">
-			<h2 id="activity-heading">Recent activity</h2>
-			<p th:if="${recent.isEmpty()}" class="muted">Nothing yet.</p>
-			<ol class="activity">
-				<li th:each="e : ${recent}">
-					<span class="muted" th:text="${#temporals.format(e.occurredOn, 'd MMM')}">1 Nov</span>
-					<a th:href="@{/applications/{id}(id=${e.application.id})}" th:text="${e.application.job.title}">Job</a>
-					<span th:switch="${e.type.name()}">
-						<span th:case="'CREATED'">saved</span>
-						<span th:case="'STAGE_CHANGE'">→ <span th:text="${e.toStage.label}">Applied</span></span>
-						<span th:case="'NOTE'">note added</span>
-					</span>
+	<!--/* First visit: explain stages and offer both ways in. */-->
+	<section th:if="${welcome}" class="welcome" aria-labelledby="welcome-heading">
+		<h1 id="welcome-heading">Welcome to JobTrack</h1>
+		<p>Keep every job you're considering in one place and remember where each one stands. Nothing is tracked yet.</p>
+		<div class="card">
+			<h2>How stages work</h2>
+			<ol class="stage-path" aria-label="The usual path">
+				<li th:each="s, it : ${pathStages}">
+					<span th:replace="~{fragments :: stage(${s})}"></span>
+					<th:block th:unless="${it.last}"><svg th:replace="~{fragments :: icon-arrow}"></svg></th:block>
 				</li>
 			</ol>
-		</aside>
-	</div>
+			<p>A new job starts as <strong>Saved</strong>, which means you're interested, not that you've applied.
+				Move it forward as things happen. Stages only move forward.</p>
+			<div class="stage-endings">
+				<span th:replace="~{fragments :: stage(${withdrawn})}"></span>
+				<span>when you stop, at any open stage.</span>
+				<span th:replace="~{fragments :: stage(${rejected})}"></span>
+				<span>when they stop, after you apply.</span>
+			</div>
+		</div>
+		<div class="entry-points">
+			<a class="entry primary" th:href="@{/applications/new}">
+				<span class="entry-title"><svg th:replace="~{fragments :: icon-plus}"></svg>Add a job by hand</span>
+				<span class="entry-text">Found it on a company site or a job board? Type in the title and company.</span>
+			</a>
+			<a th:if="${searchEnabled}" class="entry" th:href="@{/search}">
+				<span class="entry-title"><svg th:replace="~{fragments :: icon-search}"></svg>Search HiringCafe</span>
+				<span class="entry-text">Look up openings and track the ones you like. Results aren't saved until you do.</span>
+			</a>
+		</div>
+	</section>
+
+	<th:block th:unless="${welcome}">
+		<div class="page-title">
+			<h1>Your applications</h1>
+			<div class="actions">
+				<a class="button primary" th:href="@{/applications/new}"><svg th:replace="~{fragments :: icon-plus}"></svg>Add job</a>
+				<a class="button" th:if="${searchEnabled}" th:href="@{/search}"><svg th:replace="~{fragments :: icon-search}"></svg>Search HiringCafe</a>
+			</div>
+		</div>
+
+		<nav class="stage-counts" aria-label="Applications by stage">
+			<a class="count" th:href="@{${links.stage(null)}}" th:attr="aria-current=${selectedStage == null} ? 'true'">
+				<span class="number" th:text="${openTotal}">0</span><span class="all">All</span>
+			</a>
+			<th:block th:each="s : ${stages}">
+				<span th:if="${s.name() == 'ACCEPTED'}" class="divider" aria-hidden="true"></span>
+				<a class="count" th:href="@{${links.stage(s)}}" th:attr="aria-current=${s == selectedStage} ? 'true'">
+					<span class="number" th:text="${counts.get(s)}">0</span>
+					<span th:replace="~{fragments :: stage(${s})}"></span>
+				</a>
+			</th:block>
+		</nav>
+
+		<div class="columns">
+			<section class="main-column" aria-labelledby="list-heading">
+				<h2 id="list-heading" class="visually-hidden">Application list</h2>
+				<form th:action="@{/}" method="get" class="filters" role="search" aria-label="Filter applications">
+					<div class="field">
+						<label for="filter-q">Search</label>
+						<input id="filter-q" type="search" name="q" th:value="${q}" placeholder="Title, company or place">
+					</div>
+					<div class="field stage-select">
+						<label for="filter-stage">Stage</label>
+						<select id="filter-stage" name="stage">
+							<option value="">Any stage</option>
+							<option th:each="s : ${stages}" th:value="${s}" th:text="${s.label}"
+								th:selected="${s == selectedStage}">Saved</option>
+						</select>
+					</div>
+					<label class="checkbox">
+						<input type="checkbox" name="archived" value="true" th:checked="${archived}"> Show archived
+					</label>
+					<div class="actions">
+						<button type="submit">Filter</button>
+						<a th:if="${filtered}" class="button subtle" th:href="@{/}">Clear</a>
+					</div>
+				</form>
+
+				<div th:if="${applications.isEmpty()}" class="empty center" role="status">
+					<p class="empty-title">No applications match these filters</p>
+					<p class="empty-text">
+						<th:block th:if="${selectedStage != null and q != null}">Nothing in <span th:text="${selectedStage.label}">Interview</span> contains “<span th:text="${q}">designer</span>”.</th:block>
+						<th:block th:if="${selectedStage != null and q == null}">Nothing is in <span th:text="${selectedStage.label}">Interview</span> right now.</th:block>
+						<th:block th:if="${selectedStage == null and q != null}">Nothing contains “<span th:text="${q}">designer</span>”.</th:block>
+						<th:block th:unless="${archived}">Archived jobs are hidden unless you show them.</th:block>
+					</p>
+					<div class="actions">
+						<a class="button" th:href="@{/}">Clear filters</a>
+						<a class="button subtle" th:href="@{/applications/new}">Add a job</a>
+					</div>
+				</div>
+
+				<div th:unless="${applications.isEmpty()}" class="list">
+					<div class="list-meta">
+						<span th:if="${result.totalPages > 1}">Showing <span th:text="${firstRow}">1</span> to
+							<span th:text="${lastRow}">20</span> of <span th:text="${result.totalElements}">43</span></span>
+						<span th:unless="${result.totalPages > 1}"><span th:text="${result.totalElements}">14</span>
+							<span th:text="${result.totalElements == 1} ? 'application' : 'applications'">applications</span></span>
+						<span>Newest change first</span>
+					</div>
+					<table class="applications">
+						<thead>
+						<tr>
+							<th scope="col">Job</th>
+							<th scope="col">Location</th>
+							<th scope="col">Stage</th>
+							<th scope="col">Updated</th>
+						</tr>
+						</thead>
+						<tbody>
+						<tr th:each="a : ${applications}" th:classappend="${a.archived} ? 'archived'">
+							<td class="job">
+								<a th:href="@{/applications/{id}(id=${a.id})}" th:text="${a.job.title}">Junior Java Developer</a>
+								<span class="company"><span th:text="${a.job.company}">Example Logistics</span><span
+									th:if="${a.job.location}" class="place-inline" th:text="' · ' + ${a.job.location}"> · Riga</span></span>
+							</td>
+							<td class="location" th:text="${a.job.location} ?: '—'">Riga</td>
+							<td>
+								<span th:replace="~{fragments :: stage(${a.stage})}"></span>
+								<span th:if="${a.archived}" class="archived-tag"><svg th:replace="~{fragments :: icon-archive}"></svg>Archived</span>
+							</td>
+							<td><time th:datetime="${a.updatedAt}" th:text="${#temporals.format(a.updatedAt.atZone(zone), 'd MMM yyyy')}">2 Nov 2026</time></td>
+						</tr>
+						</tbody>
+					</table>
+				</div>
+
+				<nav th:if="${result.totalPages > 1}" class="pager" aria-label="Pages"
+					th:with="current=${result.number + 1}, last=${result.totalPages}">
+					<span class="summary">Showing <span th:text="${firstRow}">1</span> to <span th:text="${lastRow}">20</span>
+						of <span th:text="${result.totalElements}">43</span> · 20 per page</span>
+					<ul>
+						<li>
+							<a th:if="${current > 1}" th:href="@{${links.page(current - 1)}}" rel="prev"><svg th:replace="~{fragments :: icon-back}"></svg>Previous</a>
+							<span th:unless="${current > 1}" aria-disabled="true"><svg th:replace="~{fragments :: icon-back}"></svg>Previous</span>
+						</li>
+						<li th:each="n : ${#numbers.sequence(1, last)}" class="number">
+							<a th:href="@{${links.page(n)}}" th:attr="aria-current=${n == current} ? 'page'"><span
+								class="visually-hidden">Page </span><span th:text="${n}">1</span></a>
+						</li>
+						<li class="of">Page <span th:text="${current}">1</span> of <span th:text="${last}">3</span></li>
+						<li>
+							<a th:if="${current < last}" th:href="@{${links.page(current + 1)}}" rel="next">Next<svg th:replace="~{fragments :: icon-arrow}"></svg></a>
+							<span th:unless="${current < last}" aria-disabled="true">Next<svg th:replace="~{fragments :: icon-arrow}"></svg></span>
+						</li>
+					</ul>
+				</nav>
+			</section>
+
+			<aside class="side-column" aria-labelledby="activity-heading">
+				<div>
+					<h2 id="activity-heading">Recent activity</h2>
+					<p class="hint">Latest 8 changes across all jobs</p>
+				</div>
+				<ol class="activity">
+					<li th:each="e : ${recent}">
+						<time th:datetime="${e.occurredOn}" th:text="${#temporals.format(e.occurredOn, 'd MMM')}">2 Nov</time>
+						<span>
+							<a th:href="@{/applications/{id}(id=${e.application.id})}" th:text="${e.application.job.title}">Job</a>
+							<span class="what" th:switch="${e.type.name()}">
+								<th:block th:case="'CREATED'"><svg th:replace="~{fragments :: icon-plus}"></svg>
+									<span th:text="${e.application.job.sourceProvider.name() == 'HIRINGCAFE'} ? 'Saved from HiringCafe' : 'Added by hand'">Added by hand</span></th:block>
+								<th:block th:case="'STAGE_CHANGE'"><svg th:replace="~{fragments :: icon-arrow}"></svg>
+									<span th:text="'Moved to ' + ${e.toStage.label}">Moved to Applied</span></th:block>
+								<th:block th:case="'NOTE'"><svg th:replace="~{fragments :: icon-note}"></svg><span>Note added</span></th:block>
+							</span>
+						</span>
+					</li>
+				</ol>
+			</aside>
+		</div>
+	</th:block>
 </main>
 </body>
 </html>

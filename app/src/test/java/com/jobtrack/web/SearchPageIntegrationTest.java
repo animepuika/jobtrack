@@ -69,7 +69,7 @@ class SearchPageIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(content().string(containsString("Junior Java Developer")))
 			.andExpect(content().string(containsString("Riga, Riga · Hybrid")))
-			.andExpect(content().string(containsString(">Track</button>")));
+			.andExpect(content().string(containsString("</svg>Track</button>")));
 	}
 
 	@Test
@@ -105,7 +105,7 @@ class SearchPageIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(content().string(containsString("HiringCafe is limiting requests")))
 			.andExpect(content().string(containsString("wait <span>30</span> seconds")))
-			.andExpect(content().string(containsString("add the job by hand")));
+			.andExpect(content().string(containsString("Add a job by hand")));
 	}
 
 	private void track() throws Exception {

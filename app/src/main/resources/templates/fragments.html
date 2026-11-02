@@ -8,25 +8,77 @@
 </head>
 <body>
 
+<!--/* Page header. ${nav} names the current section: dashboard, add, search or none. */-->
 <header th:fragment="header" class="site-header">
-	<a class="brand" th:href="@{/}">JobTrack</a>
-	<nav sec:authorize="isAuthenticated()" aria-label="Main">
-		<a th:href="@{/}">Dashboard</a>
-		<a th:href="@{/applications/new}">Add job</a>
-		<a th:href="@{/search}">Search jobs</a>
-		<form th:action="@{/logout}" method="post" class="inline">
-			<button type="submit" class="link">Sign out (<span sec:authentication="name">user</span>)</button>
+	<a class="skip-link" href="#main">Skip to content</a>
+	<div class="bar">
+		<a class="brand" th:href="@{/}">
+			<svg width="19" height="16" viewBox="0 0 19 16" aria-hidden="true">
+				<rect x="0" y="10" width="3" height="6" rx="1" fill="var(--accent)"/>
+				<rect x="5.3" y="7" width="3" height="9" rx="1" fill="var(--accent)"/>
+				<rect x="10.6" y="4" width="3" height="12" rx="1" fill="var(--accent)"/>
+				<rect x="16" y="0" width="3" height="16" rx="1" fill="var(--accent)"/>
+			</svg>JobTrack</a>
+		<nav sec:authorize="isAuthenticated()" class="site-nav" aria-label="Main">
+			<a th:href="@{/}" th:attr="aria-current=${nav == 'dashboard'} ? 'page'">Dashboard</a>
+			<a th:href="@{/applications/new}" th:attr="aria-current=${nav == 'add'} ? 'page'">Add job</a>
+			<a th:href="@{/search}" th:attr="aria-current=${nav == 'search'} ? 'page'">Search jobs</a>
+		</nav>
+		<form sec:authorize="isAuthenticated()" th:action="@{/logout}" method="post" class="account">
+			<span class="who">Signed in as <span sec:authentication="name">demo</span></span>
+			<button type="submit">Sign out</button>
 		</form>
-	</nav>
+	</div>
 </header>
 
 <div th:fragment="flash">
-	<p class="flash success" role="status" th:if="${success}" th:text="${success}">Saved.</p>
-	<p class="flash error" role="alert" th:if="${error}" th:text="${error}">Something went wrong.</p>
+	<p class="flash success" role="status" tabindex="-1" th:if="${success}">
+		<svg th:replace="~{fragments :: icon-check}"></svg><span th:text="${success}">Saved.</span>
+	</p>
+	<p class="flash error" role="alert" tabindex="-1" th:if="${error}">
+		<svg th:replace="~{fragments :: icon-alert}"></svg><span th:text="${error}">Something went wrong.</span>
+	</p>
 </div>
 
+<!--/* Stage badge: a glyph plus the stage name, so color is never the only signal. */-->
 <span th:fragment="stage(stage)" class="stage" th:classappend="'stage-' + ${#strings.toLowerCase(stage.name())}"
-	th:text="${stage.label}">Saved</span>
+	th:with="filledBars=${ {'SAVED': 1, 'APPLIED': 2, 'INTERVIEW': 3, 'OFFER': 4} }">
+	<th:block th:switch="${stage.name()}">
+		<svg th:case="'ACCEPTED'" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+			<circle cx="6" cy="6" r="6" fill="currentColor"/>
+			<path d="M3.3 6.2l1.8 1.8 3.7-3.9" fill="none" stroke="var(--st-accepted-bg)" stroke-width="1.6"
+				stroke-linecap="round" stroke-linejoin="round"/>
+		</svg>
+		<svg th:case="'REJECTED'" width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
+			<path d="M1 5h7.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+			<rect x="10.5" y="0" width="3" height="10" rx="1" fill="currentColor"/>
+		</svg>
+		<svg th:case="'WITHDRAWN'" width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
+			<path d="M13 5H2.5M6 1.5L2.5 5 6 8.5" fill="none" stroke="currentColor" stroke-width="1.7"
+				stroke-linecap="round" stroke-linejoin="round"/>
+		</svg>
+		<svg th:case="*" width="17" height="10" viewBox="0 0 17 10" aria-hidden="true">
+			<rect th:each="i : ${#numbers.sequence(0, 3)}" th:attr="x=${i * 4.5}, opacity=${i < filledBars.get(stage.name())} ? null : '.25'"
+				y="0" width="3" height="10" rx="1" fill="currentColor"/>
+		</svg>
+	</th:block>
+	<span th:text="${stage.label}">Saved</span>
+</span>
+
+<!--/* Icons: 20x20, stroked with the text color, hidden from screen readers. */-->
+<svg th:fragment="icon-plus" class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+<svg th:fragment="icon-search" class="icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M13.2 13.2L17 17"/></svg>
+<svg th:fragment="icon-back" class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10H4M9 5l-5 5 5 5"/></svg>
+<svg th:fragment="icon-arrow" class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
+<svg th:fragment="icon-external" class="icon icon-sm" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h12v-4M11 3h6v6M17 3l-8 8"/></svg>
+<svg th:fragment="icon-check" class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>
+<svg th:fragment="icon-alert" class="icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v5M10 13.8v.1"/></svg>
+<svg th:fragment="icon-info" class="icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M10 9v5M10 6.2v.1"/></svg>
+<svg th:fragment="icon-clock" class="icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4l2.5 2"/></svg>
+<svg th:fragment="icon-edit" class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M13.5 3.5l3 3L7 16H4v-3z"/></svg>
+<svg th:fragment="icon-archive" class="icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="4" rx="1"/><path d="M4.5 8v8h11V8M8 11.5h4"/></svg>
+<svg th:fragment="icon-note" class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3h10v14H5zM8 7h4M8 10h4M8 13h2"/></svg>
+<svg th:fragment="icon-lock" class="icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="9" width="10" height="8" rx="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg>
 
 </body>
 </html>

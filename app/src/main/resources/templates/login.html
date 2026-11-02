@@ -3,19 +3,29 @@
 <head th:replace="~{fragments :: head('Sign in')}"></head>
 <body>
 <header th:replace="~{fragments :: header}"></header>
-<main class="narrow">
+<main id="main" class="narrow-sm">
 	<h1>Sign in</h1>
-	<p class="flash error" role="alert" th:if="${param.error}">Wrong username or password.</p>
-	<p class="flash success" role="status" th:if="${param.logout}">You are signed out.</p>
+	<p class="lead">Your job applications, in one place.</p>
+	<p class="flash error" role="alert" th:if="${param.error}">
+		<svg th:replace="~{fragments :: icon-alert}"></svg>
+		<span>That username and password don't match. Check them and try again.</span>
+	</p>
+	<p class="flash success" role="status" th:if="${param.logout}">
+		<svg th:replace="~{fragments :: icon-check}"></svg><span>You're signed out.</span>
+	</p>
 	<form th:action="@{/login}" method="post" class="card stack">
-		<label>Username
-			<input type="text" name="username" autocomplete="username" required autofocus>
-		</label>
-		<label>Password
-			<input type="password" name="password" autocomplete="current-password" required>
-		</label>
+		<div class="field">
+			<label for="username">Username</label>
+			<input id="username" type="text" name="username" autocomplete="username" required autofocus>
+		</div>
+		<div class="field">
+			<label for="password">Password</label>
+			<input id="password" type="password" name="password" autocomplete="current-password" required>
+		</div>
 		<button type="submit" class="primary">Sign in</button>
 	</form>
+	<p th:if="${demo}" class="demo-hint">Trying the demo? Use <strong>demo</strong> and <strong>demo-password</strong>.</p>
+	<p class="fine-print">There's no sign-up. Accounts are set up by whoever runs this JobTrack.</p>
 </main>
 </body>
 </html>

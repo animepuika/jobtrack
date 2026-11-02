@@ -6,7 +6,10 @@ everything on a dashboard. It covers milestones 1–5 of the
 [project plan](../docs/project-plan.md).
 
 Built with Java 25, Spring Boot 4.1.2, PostgreSQL, Flyway, Spring Data JPA,
-Spring Security, and Thymeleaf.
+Spring Security, and Thymeleaf. The interface follows a "quiet utility" design made
+with Claude Design from [the design brief](../docs/design-prompt.md): one plain CSS
+file with light and dark themes, stage badges that use a glyph as well as color,
+44 px touch targets, and no JavaScript.
 
 ## Run it
 
@@ -48,8 +51,8 @@ The account is created on the first start. Your records live in the
 ./mvnw test
 ```
 
-81 tests: business rules, URL handling, the HiringCafe adapter against a local fake
-server, and integration tests that run the whole app against a real PostgreSQL
+91 tests: business rules, URL handling, the HiringCafe adapter against a local fake
+server, the page states (welcome, paging, errors, final stages), and integration tests that run the whole app against a real PostgreSQL
 started by Testcontainers. No test calls the real HiringCafe.
 
 Without Docker, point the tests at an existing PostgreSQL instead:

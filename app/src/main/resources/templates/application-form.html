@@ -1,44 +1,83 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments :: head(${editing} ? 'Edit job' : 'Add job')}"></head>
+<head th:replace="~{fragments :: head(${editing} ? 'Edit job details' : 'Add a job')}"></head>
 <body>
 <header th:replace="~{fragments :: header}"></header>
-<main class="narrow">
-	<h1 th:text="${editing} ? 'Edit job' : 'Add a job'">Add a job</h1>
-	<p th:unless="${editing}" class="muted">Type in a job you found anywhere. It starts in the Saved stage, which means
-		"interested", not "applied".</p>
+<main id="main" class="narrow">
+	<a class="back-link" th:href="${editing} ? @{/applications/{id}(id=${applicationId})} : @{/}"><svg
+		th:replace="~{fragments :: icon-back}"></svg><span th:text="${editing} ? 'Back to the application' : 'All applications'">All applications</span></a>
+	<h1 th:text="${editing} ? 'Edit job details' : 'Add a job'">Add a job</h1>
+	<p th:unless="${editing}" class="lead">Type in a job you found anywhere. It starts as <strong>Saved</strong>, which
+		means you're interested, not that you've applied.</p>
+	<p th:if="${editing}" class="lead">Changes apply to this job only. The history stays as it is.</p>
 
-	<p th:if="${duplicateId}" class="flash error" role="alert">
-		You already track this job.
-		<a th:href="@{/applications/{id}(id=${duplicateId})}">Open it</a>
-	</p>
+	<div th:if="${duplicate}" class="flash info" role="alert" tabindex="-1">
+		<svg th:replace="~{fragments :: icon-info}"></svg>
+		<span><strong>You already track this job.</strong>
+			<span th:text="${duplicate.job.title} + ' at ' + ${duplicate.job.company}">Junior Java Developer at Example Logistics</span><span
+				th:if="${duplicateSavedOn}" th:text="', saved on ' + ${#temporals.format(duplicateSavedOn, 'd MMM yyyy')}">, saved on 18 Oct 2026</span>
+			and now at <span th:text="${duplicate.stage.label}">Interview</span>. Nothing new was saved.
+			<a th:href="@{/applications/{id}(id=${duplicate.id})}">Open it</a></span>
+	</div>
 
 	<form th:object="${jobForm}" method="post" class="card stack" novalidate
 		th:action="${editing} ? @{/applications/{id}/edit(id=${applicationId})} : @{/applications}">
-		<p th:if="${#fields.hasGlobalErrors()}" class="flash error" role="alert" th:text="${#fields.globalErrors()[0]}">Error</p>
 
-		<label>Job title
-			<input type="text" th:field="*{title}" maxlength="200" required th:errorclass="invalid">
-			<span class="field-error" th:if="${#fields.hasErrors('title')}" th:errors="*{title}">Enter a job title</span>
-		</label>
-		<label>Company
-			<input type="text" th:field="*{company}" maxlength="200" required th:errorclass="invalid">
-			<span class="field-error" th:if="${#fields.hasErrors('company')}" th:errors="*{company}">Enter a company</span>
-		</label>
-		<label>Location <span class="muted">(optional)</span>
-			<input type="text" th:field="*{location}" maxlength="200" placeholder="Riga, Remote, …">
-			<span class="field-error" th:if="${#fields.hasErrors('location')}" th:errors="*{location}">Too long</span>
-		</label>
-		<label>Link to the listing <span class="muted">(optional)</span>
-			<input type="url" th:field="*{sourceUrl}" maxlength="2000" placeholder="https://…"
-				th:readonly="${editing}" th:errorclass="invalid">
-			<span class="field-error" th:if="${#fields.hasErrors('sourceUrl')}" th:errors="*{sourceUrl}">Too long</span>
-			<span th:if="${editing}" class="muted">The link identifies the job, so it cannot be changed.</span>
-		</label>
+		<div th:if="${#fields.hasErrors('*')}" class="error-summary" role="alert" tabindex="-1" aria-labelledby="error-heading">
+			<h2 id="error-heading" class="flash-title" th:text="${#fields.errors('*').size() == 1} ? 'One thing needs fixing' : 'Some things need fixing'">Some things need fixing</h2>
+			<ul>
+				<li th:each="err : ${#fields.detailedErrors()}">
+					<a th:if="${err.global}" href="#title" th:text="${err.message}">Error</a>
+					<a th:unless="${err.global}" th:href="'#' + ${err.fieldName}" th:text="${err.message}">Enter a job title</a>
+				</li>
+			</ul>
+		</div>
+
+		<div class="field">
+			<label for="title">Job title <span class="required">(required)</span></label>
+			<span id="title-error" class="field-error" th:if="${#fields.hasErrors('title')}"><svg
+				th:replace="~{fragments :: icon-alert}"></svg><span th:errors="*{title}">Enter a job title</span></span>
+			<input type="text" th:field="*{title}" maxlength="200" required
+				th:attr="aria-invalid=${#fields.hasErrors('title')} ? 'true', aria-describedby=${#fields.hasErrors('title')} ? 'title-error'">
+		</div>
+		<div class="field">
+			<label for="company">Company <span class="required">(required)</span></label>
+			<span id="company-error" class="field-error" th:if="${#fields.hasErrors('company')}"><svg
+				th:replace="~{fragments :: icon-alert}"></svg><span th:errors="*{company}">Enter a company</span></span>
+			<input type="text" th:field="*{company}" maxlength="200" required
+				th:attr="aria-invalid=${#fields.hasErrors('company')} ? 'true', aria-describedby=${#fields.hasErrors('company')} ? 'company-error'">
+		</div>
+		<div class="field">
+			<label for="location">Location <span class="optional">(optional)</span></label>
+			<span id="location-error" class="field-error" th:if="${#fields.hasErrors('location')}"><svg
+				th:replace="~{fragments :: icon-alert}"></svg><span th:errors="*{location}">Too long</span></span>
+			<input type="text" th:field="*{location}" maxlength="200" placeholder="Riga, Remote"
+				th:attr="aria-invalid=${#fields.hasErrors('location')} ? 'true', aria-describedby=${#fields.hasErrors('location')} ? 'location-error'">
+		</div>
+		<div class="field">
+			<label for="sourceUrl">Link to the listing <span class="optional">(optional)</span></label>
+			<th:block th:if="${editing}">
+				<span id="sourceUrl-hint" class="hint">The link identifies the job, so it can't be changed.</span>
+				<div class="locked-link">
+					<svg th:replace="~{fragments :: icon-lock}"></svg>
+					<input type="url" th:field="*{sourceUrl}" readonly aria-describedby="sourceUrl-hint" placeholder="No link">
+				</div>
+			</th:block>
+			<th:block th:unless="${editing}">
+				<span id="sourceUrl-hint" class="hint" th:unless="${#fields.hasErrors('sourceUrl')}">Used to spot duplicates.
+					You can't change it after saving.</span>
+				<span id="sourceUrl-error" class="field-error" th:if="${#fields.hasErrors('sourceUrl')}"><svg
+					th:replace="~{fragments :: icon-alert}"></svg><span th:errors="*{sourceUrl}">Enter the full link</span></span>
+				<input type="url" th:field="*{sourceUrl}" maxlength="2000" placeholder="https://"
+					th:attr="aria-invalid=${#fields.hasErrors('sourceUrl')} ? 'true', aria-describedby=${#fields.hasErrors('sourceUrl')} ? 'sourceUrl-error' : 'sourceUrl-hint'">
+			</th:block>
+		</div>
+		<p th:if="${editing}" class="hint">Source: <span th:text="${source != null and source.name() == 'HIRINGCAFE'} ? 'HiringCafe' : 'added by hand'">added by hand</span>.
+			Stage and history are changed from the application page.</p>
 
 		<div class="actions">
 			<button type="submit" class="primary" th:text="${editing} ? 'Save changes' : 'Save job'">Save job</button>
-			<a th:href="${editing} ? @{/applications/{id}(id=${applicationId})} : @{/}">Cancel</a>
+			<a class="button subtle" th:href="${editing} ? @{/applications/{id}(id=${applicationId})} : @{/}">Cancel</a>
 		</div>
 	</form>
 </main>
