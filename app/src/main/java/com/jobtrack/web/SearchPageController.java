@@ -1,5 +1,7 @@
 package com.jobtrack.web;
 
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -12,6 +14,10 @@ import com.jobtrack.jobsource.JobSearchQuery.Workplace;
 import com.jobtrack.jobsource.JobSearchResult;
 import com.jobtrack.jobsource.JobSource;
 import com.jobtrack.jobsource.JobSourceException;
+import com.jobtrack.matching.FitScorer;
+import com.jobtrack.matching.FitScorer.Fit;
+import com.jobtrack.matching.SkillProfileService;
+import com.jobtrack.matching.UserSkill;
 import com.jobtrack.tracking.TrackingService;
 import com.jobtrack.user.JobTrackUser;
 
@@ -36,17 +42,27 @@ class SearchPageController {
 
 	private final TrackingService tracking;
 
-	SearchPageController(JobSource jobSource, JobImportService imports, TrackingService tracking) {
+	private final SkillProfileService skills;
+
+	SearchPageController(JobSource jobSource, JobImportService imports, TrackingService tracking,
+			SkillProfileService skills) {
 		this.jobSource = jobSource;
 		this.imports = imports;
 		this.tracking = tracking;
+		this.skills = skills;
 	}
 
 	@GetMapping("/search")
 	String search(@AuthenticationPrincipal JobTrackUser user, @RequestParam(required = false) String keywords,
 			@RequestParam(required = false) String location, @RequestParam(required = false) Workplace workplace,
-			@RequestParam(required = false) Seniority seniority, Model model) {
+			@RequestParam(required = false) Seniority seniority, @RequestParam(required = false) String sort,
+			Model model) {
+		List<String> userSkills = this.skills.list(user.getId()).stream().map(UserSkill::getName).toList();
+		boolean byFit = !userSkills.isEmpty() && !"provider".equals(sort);
 		model.addAttribute("nav", "search");
+		model.addAttribute("hasSkills", !userSkills.isEmpty());
+		model.addAttribute("skillSearch", String.join(" ", userSkills.stream().limit(2).toList()));
+		model.addAttribute("byFit", byFit);
 		model.addAttribute("keywords", keywords);
 		model.addAttribute("location", location);
 		model.addAttribute("workplace", workplace);
@@ -61,7 +77,19 @@ class SearchPageController {
 			JobSearchPage page = this.jobSource.search(new JobSearchQuery(keywords, location, workplace, seniority));
 			Map<String, Long> tracked = this.tracking.findTrackedApplicationIds(user.getId(),
 					this.jobSource.provider(), page.results().stream().map(JobSearchResult::externalId).toList());
+			Map<String, Fit> fits = new HashMap<>();
+			if (!userSkills.isEmpty()) {
+				page.results().forEach((result) -> fits.put(result.externalId(),
+						FitScorer.score(result.matchingText(), userSkills)));
+			}
+			List<JobSearchResult> results = byFit ? page.results()
+				.stream()
+				.sorted(Comparator.comparing((JobSearchResult result) -> fits.get(result.externalId()).level())
+					.thenComparing((result) -> -fits.get(result.externalId()).percent()))
+				.toList() : page.results();
 			model.addAttribute("page", page);
+			model.addAttribute("results", results);
+			model.addAttribute("fits", fits);
 			model.addAttribute("tracked", tracked);
 		}
 		catch (JobSourceException ex) {

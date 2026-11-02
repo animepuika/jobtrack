@@ -67,6 +67,9 @@ class HiringCafeJobSourceTest {
 		assertThat(first.location()).isEqualTo("Riga, Riga");
 		assertThat(first.highlights()).containsExactly("Riga, Riga · Hybrid", "30k–40k/yr", "Full Time · Entry Level");
 		assertThat(first.url()).isEqualTo("https://hiringcafe.com/job/junior-java-developer-fixture00000001");
+		assertThat(first.summary())
+			.isEqualTo("Fictional summary: Java and Spring Boot with PostgreSQL; Docker is a plus.");
+		assertThat(page.results().get(1).summary()).isEqualTo("Fictional summary: Python and Django.");
 	}
 
 	@Test

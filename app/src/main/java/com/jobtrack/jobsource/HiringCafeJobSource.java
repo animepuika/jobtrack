@@ -4,12 +4,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -41,6 +45,8 @@ class HiringCafeJobSource implements JobSource {
 	private static final String PROTOCOL_VERSION = "2025-06-18";
 
 	private static final int MAX_ATTEMPTS = 2;
+
+	private static final Pattern JOB_ID_LINE = Pattern.compile("\\*\\*Job ID:\\*\\*\\s*(\\S+)");
 
 	private final HiringCafeProperties properties;
 
@@ -86,8 +92,9 @@ class HiringCafeJobSource implements JobSource {
 			throw new JobSourceException("HiringCafe answered in an unexpected format");
 		}
 		List<JobSearchResult> results = new ArrayList<>();
+		Map<String, String> summaries = summariesById(result.firstText());
 		for (JobCard card : cards.jobs()) {
-			toResult(card).ifPresent(results::add);
+			toResult(card, summaries.get(card.id())).ifPresent(results::add);
 		}
 		int total = (cards.total() != null) ? cards.total() : results.size();
 		return new JobSearchPage(List.copyOf(results), total);
@@ -152,7 +159,7 @@ class HiringCafeJobSource implements JobSource {
 		}
 	}
 
-	private static Optional<JobSearchResult> toResult(JobCard card) {
+	private static Optional<JobSearchResult> toResult(JobCard card, String summary) {
 		if (isBlank(card.id()) || isBlank(card.title()) || isBlank(card.company())) {
 			return Optional.empty();
 		}
@@ -166,7 +173,36 @@ class HiringCafeJobSource implements JobSource {
 			url = null;
 		}
 		return Optional.of(new JobSearchResult(card.id(), card.title(), card.company(),
-				locationFrom(highlights), highlights, url));
+				locationFrom(highlights), highlights, url, summary));
+	}
+
+	/**
+	 * The markdown part of a search response has one section per job: a heading,
+	 * labelled lines ending with "**Job ID:** …", then a one-paragraph requirements
+	 * summary. Returns that summary by job ID. Display text can change, so a missing
+	 * summary is simply left out.
+	 */
+	static Map<String, String> summariesById(String markdown) {
+		Map<String, String> summaries = new HashMap<>();
+		if (markdown == null) {
+			return summaries;
+		}
+		for (String section : markdown.split("\n### ")) {
+			Matcher id = JOB_ID_LINE.matcher(section);
+			if (!id.find()) {
+				continue;
+			}
+			String rest = section.substring(id.end());
+			int end = rest.indexOf("\n---");
+			String summary = ((end >= 0) ? rest.substring(0, end) : rest).lines()
+				.map(String::strip)
+				.filter((line) -> !line.isEmpty() && !line.startsWith("-") && !line.startsWith("**"))
+				.collect(Collectors.joining(" "));
+			if (!summary.isEmpty()) {
+				summaries.put(id.group(1), summary);
+			}
+		}
+		return summaries;
 	}
 
 	/**

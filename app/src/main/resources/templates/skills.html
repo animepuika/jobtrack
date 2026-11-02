@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Your skills')}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main id="main" class="narrow">
+	<a class="back-link" th:href="@{/search}"><svg th:replace="~{fragments :: icon-back}"></svg>Search jobs</a>
+	<h1>Your skills</h1>
+	<p class="lead">JobTrack compares each search result with these skills and shows which ones match and which
+		are missing. Your CV is read on this computer only; just the skill names are kept, not the CV text.</p>
+	<div th:replace="~{fragments :: flash}"></div>
+
+	<section class="card stack" aria-labelledby="from-cv-heading">
+		<h2 id="from-cv-heading">Read skills from a CV</h2>
+		<p th:if="${profile != null and profile.cvLabel != null}" class="hint">Last read from
+			<strong th:text="${profile.cvLabel}">Backend CV</strong> on
+			<span th:text="${#temporals.format(profile.updatedAt.atZone(zone), 'd MMM yyyy')}">2 Nov 2026</span>.
+			Reading again replaces skills from the CV and keeps the ones you added by hand.</p>
+		<form th:unless="${cvs.isEmpty()}" th:action="@{/skills/from-cv}" method="post" class="inline-form">
+			<div class="field">
+				<label for="skills-cv">CV</label>
+				<select id="skills-cv" name="cvVersionId">
+					<option th:each="cv : ${cvs}" th:value="${cv.id}" th:text="${cv.label}"
+						th:selected="${profile != null and cv.id == profile.cvVersionId}">Backend CV</option>
+				</select>
+			</div>
+			<button type="submit" class="primary">Read skills</button>
+		</form>
+		<p th:if="${cvs.isEmpty()}" class="hint"><a th:href="@{/cvs}">Upload a CV</a> first, or add skills by hand below.</p>
+	</section>
+
+	<section class="card stack" aria-labelledby="skills-heading">
+		<h2 id="skills-heading">Skills <span class="hint" th:text="'(' + ${skills.size()} + ')'">(8)</span></h2>
+		<p th:if="${skills.isEmpty()}" class="hint">No skills yet.</p>
+		<ul th:unless="${skills.isEmpty()}" class="skill-list">
+			<li th:each="s : ${skills}">
+				<span th:text="${s.name}">Java</span>
+				<span th:if="${s.fromCv and s.weight > 1}" class="hint" th:text="'×' + ${s.weight}">×4</span>
+				<form th:action="@{/skills/remove}" method="post" class="inline">
+					<input type="hidden" name="name" th:value="${s.name}">
+					<button type="submit" class="remove" th:attr="aria-label='Remove ' + ${s.name}">×</button>
+				</form>
+			</li>
+		</ul>
+		<form th:action="@{/skills}" method="post" class="inline-form">
+			<div class="field">
+				<label for="skill-name">Add a skill</label>
+				<input id="skill-name" type="text" name="name" maxlength="60" required placeholder="Kotlin, Figma, Excel…">
+			</div>
+			<button type="submit">Add</button>
+		</form>
+		<p class="hint">The number after a skill is how often your CV mentions it; the most frequent ones are used for
+			"Search with my skills".</p>
+	</section>
+</main>
+</body>
+</html>

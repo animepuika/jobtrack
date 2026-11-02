@@ -49,6 +49,11 @@ fictional demo data, and a short walkthrough recording.
 Automatic job applications, mailbox access, bulk job aggregation, AI matching,
 paid email/SMS delivery, and subscriptions are outside the planned version.
 
+*Scope change, November 2, 2026:* at the learner's request, JobTrack compares
+search results with skills read from the user's CV. It is rule-based (a catalog of
+known skills and their spellings), runs locally, stores only skill names, and uses
+no AI model or paid API, so it stays within the cost and privacy goals above.
+
 ## Proposed stack
 
 | Area | Choice | Purpose |

@@ -44,6 +44,9 @@
 		<button type="submit" class="primary"><svg th:replace="~{fragments :: icon-search}"></svg>Search</button>
 	</form>
 
+	<p th:if="${searchEnabled and hasSkills and (keywords == null or keywords.isBlank())}" class="hint">
+		<a th:href="@{/search(keywords=${skillSearch})}">Search with my skills</a> (<span th:text="${skillSearch}">java spring boot</span>)
+		· <a th:href="@{/skills}">Edit your skills</a></p>
 	<div th:if="${searchEnabled and (keywords == null or keywords.isBlank())}" class="empty narrow-card">
 		<p class="empty-title">Start with a few keywords</p>
 		<p class="empty-text">A job title or a skill works best, like “junior java developer”. Location, workplace and
@@ -81,8 +84,20 @@
 				<span th:text="${page.total()}">33</span> matches</h2>
 			<p class="hint results-hint">HiringCafe's location filter is broad, so check the place on each result. Narrow
 				your keywords to see different matches.</p>
+			<div th:if="${hasSkills}" class="sort-row">
+				<span class="hint">Order:</span>
+				<a th:if="${!byFit}" th:href="@{/search(keywords=${keywords},location=${location},workplace=${workplace},seniority=${seniority})}">Best fit first</a>
+				<strong th:if="${byFit}">Best fit first</strong>
+				<span aria-hidden="true">·</span>
+				<a th:if="${byFit}" th:href="@{/search(keywords=${keywords},location=${location},workplace=${workplace},seniority=${seniority},sort='provider')}">HiringCafe's order</a>
+				<strong th:if="${!byFit}">HiringCafe's order</strong>
+				<span aria-hidden="true">·</span>
+				<a th:href="@{/skills}">Edit your skills</a>
+			</div>
+			<p th:unless="${hasSkills}" class="hint results-hint"><a th:href="@{/skills}">Add your skills</a>, or read them
+				from your CV, to see how well each job fits you.</p>
 			<ul class="results">
-				<li th:each="r : ${page.results()}" class="result">
+				<li th:each="r : ${results}" class="result" th:with="fit=${fits.get(r.externalId())}">
 					<div>
 						<h3><a th:href="${r.url()}" target="_blank" rel="noopener noreferrer"><span th:text="${r.title()}">Junior Java Developer</span><svg
 							th:replace="~{fragments :: icon-external}"></svg><span class="visually-hidden">(opens in a new tab)</span></a></h3>
@@ -91,6 +106,18 @@
 					<ul class="chips" aria-label="Highlights">
 						<li th:each="h : ${r.highlights()}" th:text="${h}">Riga · Hybrid</li>
 					</ul>
+					<div th:if="${fit != null}" class="fit" th:classappend="'fit-' + ${#strings.toLowerCase(fit.level().name())}">
+						<p class="fit-level">
+							<strong th:text="${fit.level().label}">Strong fit</strong>
+							<span th:if="${fit.isKnown()}" class="hint"
+								th:text="${fit.matched().size()} + ' of ' + ${fit.matched().size() + fit.missing().size()} + ' skills'">3 of 4 skills</span>
+						</p>
+						<p th:unless="${fit.isKnown()}" class="hint">The summary doesn't name skills; open the listing to check.</p>
+						<p th:unless="${fit.matched().isEmpty()}" class="fit-skills"><span class="hint">You have:</span>
+							<span th:text="${#strings.listJoin(fit.matched(), ', ')}">Java, Spring Boot</span></p>
+						<p th:unless="${fit.missing().isEmpty()}" class="fit-skills"><span class="hint">Missing:</span>
+							<span th:text="${#strings.listJoin(fit.missing(), ', ')}">Kubernetes</span></p>
+					</div>
 					<div class="result-action">
 						<a th:if="${tracked[r.externalId()]}" class="button tracked"
 							th:href="@{/applications/{id}(id=${tracked[r.externalId()]})}"><svg th:replace="~{fragments :: icon-check}"></svg>Tracked · open</a>

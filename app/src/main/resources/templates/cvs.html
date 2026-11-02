@@ -45,7 +45,13 @@
 						uploaded <time th:datetime="${cv.uploadedAt}" th:text="${#temporals.format(cv.uploadedAt.atZone(zone), 'd MMM yyyy')}">2 Nov 2026</time>
 					</p>
 				</div>
-				<a class="button" th:href="@{/cvs/{id}/download(id=${cv.id})}">Download</a>
+				<div class="actions">
+					<form th:action="@{/skills/from-cv}" method="post">
+						<input type="hidden" name="cvVersionId" th:value="${cv.id}">
+						<button type="submit">Use for matching</button>
+					</form>
+					<a class="button" th:href="@{/cvs/{id}/download(id=${cv.id})}">Download</a>
+				</div>
 			</li>
 		</ul>
 	</section>

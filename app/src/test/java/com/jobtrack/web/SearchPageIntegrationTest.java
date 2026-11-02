@@ -10,6 +10,7 @@ import com.jobtrack.jobsource.JobSearchQuery;
 import com.jobtrack.jobsource.JobSearchResult;
 import com.jobtrack.jobsource.JobSource;
 import com.jobtrack.jobsource.JobSourceException;
+import com.jobtrack.matching.SkillProfileService;
 import com.jobtrack.tracking.SourceProvider;
 import com.jobtrack.user.JobTrackUser;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -49,6 +51,9 @@ class SearchPageIntegrationTest {
 	@Autowired
 	private TestUsers users;
 
+	@Autowired
+	private SkillProfileService skills;
+
 	@MockitoBean
 	private JobSource jobSource;
 
@@ -70,6 +75,39 @@ class SearchPageIntegrationTest {
 			.andExpect(content().string(containsString("Junior Java Developer")))
 			.andExpect(content().string(containsString("Riga, Riga · Hybrid")))
 			.andExpect(content().string(containsString("</svg>Track</button>")));
+	}
+
+	@Test
+	void withSkillsResultsShowTheirFitAndTheBestFitComesFirst() throws Exception {
+		this.skills.add(this.user.getId(), "Java");
+		this.skills.add(this.user.getId(), "Spring Boot");
+		JobSearchResult pythonJob = new JobSearchResult("fixture00000002", "Backend Intern", "Sample Health", "Europe",
+				List.of("Europe · Remote"), "https://hiringcafe.com/job/backend-intern-fixture00000002",
+				"Python, Django and AWS");
+		JobSearchResult javaJob = new JobSearchResult(RESULT.externalId(), RESULT.title(), RESULT.company(),
+				RESULT.location(), RESULT.highlights(), RESULT.url(), "Java and Spring Boot, Kubernetes is a plus");
+		given(this.jobSource.search(any(JobSearchQuery.class)))
+			.willReturn(new JobSearchPage(List.of(pythonJob, javaJob), 2));
+
+		String html = this.mvc.perform(get("/search").param("keywords", "developer").with(user(this.user)))
+			.andExpect(status().isOk())
+			.andExpect(content().string(containsString("Strong fit")))
+			.andExpect(content().string(containsString("Low fit")))
+			.andExpect(content().string(containsString("Kubernetes")))
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html.indexOf("Junior Java Developer")).isLessThan(html.indexOf("Backend Intern"));
+	}
+
+	@Test
+	void withoutSkillsThePageSuggestsAddingThem() throws Exception {
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 1));
+
+		this.mvc.perform(get("/search").param("keywords", "java").with(user(this.user)))
+			.andExpect(content().string(containsString("Add your skills")))
+			.andExpect(content().string(org.hamcrest.Matchers.not(containsString("fit-level"))));
 	}
 
 	@Test

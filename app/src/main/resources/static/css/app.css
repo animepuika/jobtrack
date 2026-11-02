@@ -417,3 +417,19 @@ details.reschedule form { margin-top: 8px; }
 .done-reminders { margin-top: 10px; }
 .done-reminders > summary { padding-left: 0; }
 .link-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: var(--text-base); }
+
+/* CV matching: fit labels on search results and the skills page. Fit uses a word
+   and a border style as well as color, like the stage badges. */
+.sort-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 14px; font-size: var(--text-sm); }
+.fit { padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface-2); border-left: 4px solid var(--line-strong); font-size: var(--text-sm); display: flex; flex-direction: column; gap: 4px; }
+.fit-level { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.fit-strong { border-left-color: var(--st-accepted); }
+.fit-strong .fit-level strong { color: var(--st-accepted); }
+.fit-some { border-left-color: var(--st-applied); }
+.fit-low { border-left-style: dashed; }
+.fit-unknown { border-left-style: dotted; }
+.fit-skills { color: var(--ink-2); overflow-wrap: anywhere; }
+.skill-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.skill-list li { display: inline-flex; align-items: center; gap: 6px; padding: 0 4px 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface); font-weight: 500; }
+.skill-list button.remove { min-height: 36px; min-width: 36px; padding: 0; border: 0; background: transparent; color: var(--ink-3); font-size: 1.2rem; }
+.skill-list button.remove:hover { color: var(--danger); }
