@@ -1,5 +1,6 @@
-# Local PostgreSQL for JobTrack: docker compose up -d
-# The password is for this local container only.
+# Local PostgreSQL for JobTrack:          docker compose up -d
+# PostgreSQL and the app in containers:  docker compose --profile app up --build
+# The database password is for these local containers only.
 services:
   postgres:
     image: postgres:18-alpine
@@ -17,5 +18,21 @@ services:
       timeout: 3s
       retries: 10
 
+  app:
+    profiles: ["app"]
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      JOBTRACK_DB_URL: jdbc:postgresql://postgres:5432/jobtrack
+      JOBTRACK_USERNAME: ${JOBTRACK_USERNAME:-}
+      JOBTRACK_PASSWORD: ${JOBTRACK_PASSWORD:-}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - jobtrack-documents:/app/data
+
 volumes:
   jobtrack-data:
+  jobtrack-documents:

@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Personal files: uploaded CVs and local data ###
+data/

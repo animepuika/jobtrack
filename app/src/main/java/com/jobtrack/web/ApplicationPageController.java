@@ -2,7 +2,12 @@ package com.jobtrack.web;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
 
+import com.jobtrack.documents.CvService;
+import com.jobtrack.documents.CvVersion;
+import com.jobtrack.reminders.Reminder;
+import com.jobtrack.reminders.ReminderService;
 import com.jobtrack.tracking.ApplicationDetails;
 import com.jobtrack.tracking.DuplicateJobException;
 import com.jobtrack.tracking.JobApplication;
@@ -38,10 +43,16 @@ class ApplicationPageController {
 
 	private final TrackingService tracking;
 
+	private final CvService cvVersions;
+
+	private final ReminderService reminders;
+
 	private final Clock clock;
 
-	ApplicationPageController(TrackingService tracking, Clock clock) {
+	ApplicationPageController(TrackingService tracking, CvService cvVersions, ReminderService reminders, Clock clock) {
 		this.tracking = tracking;
+		this.cvVersions = cvVersions;
+		this.reminders = reminders;
 		this.clock = clock;
 	}
 
@@ -91,7 +102,26 @@ class ApplicationPageController {
 		model.addAttribute("savedOn", StageProgress.savedOn(details.history()));
 		model.addAttribute("updatedOn", LocalDate.ofInstant(application.getUpdatedAt(), this.clock.getZone()));
 		model.addAttribute("today", this.tracking.today());
+		List<CvVersion> cvs = this.cvVersions.list(user.getId());
+		model.addAttribute("cvs", cvs);
+		model.addAttribute("currentCv", cvs.stream()
+			.filter((cv) -> cv.getId().equals(application.getCvVersionId()))
+			.findFirst()
+			.orElse(null));
+		List<Reminder> reminderList = this.reminders.forApplication(user.getId(), id);
+		model.addAttribute("openReminders", reminderList.stream().filter((r) -> !r.isCompleted()).toList());
+		model.addAttribute("doneReminders", reminderList.stream().filter(Reminder::isCompleted).toList());
+		model.addAttribute("now", this.reminders.now());
+		model.addAttribute("zone", this.clock.getZone());
 		return "application-detail";
+	}
+
+	@PostMapping("/{id}/cv")
+	String useCv(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id,
+			@RequestParam(required = false) Long cvVersionId, RedirectAttributes redirect) {
+		this.tracking.useCvVersion(user.getId(), id, cvVersionId);
+		redirect.addFlashAttribute("success", (cvVersionId != null) ? "CV version saved." : "CV version cleared.");
+		return "redirect:/applications/" + id;
 	}
 
 	@PostMapping("/{id}/stage")

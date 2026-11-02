@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Your CVs')}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main id="main" class="narrow">
+	<a class="back-link" th:href="@{/}"><svg th:replace="~{fragments :: icon-back}"></svg>All applications</a>
+	<h1>Your CVs</h1>
+	<p class="lead">Upload each version you send, then pick it on the application. Files are private: only you can
+		download them, and they are never shown in the browser.</p>
+	<div th:replace="~{fragments :: flash}"></div>
+
+	<form th:action="@{/cvs}" method="post" enctype="multipart/form-data" class="card stack">
+		<h2>Upload a CV</h2>
+		<div class="field">
+			<label for="cv-label">Name</label>
+			<span id="cv-label-hint" class="hint">Something you'll recognise, like “Backend CV, Nov 2026”.</span>
+			<input id="cv-label" type="text" name="label" maxlength="100" required th:value="${label}"
+				aria-describedby="cv-label-hint">
+		</div>
+		<div class="field">
+			<label for="cv-file">File</label>
+			<span id="cv-file-hint" class="hint">PDF or Word (.docx), up to 5 MB.</span>
+			<input id="cv-file" type="file" name="file" accept=".pdf,.docx" required aria-describedby="cv-file-hint">
+		</div>
+		<div class="actions">
+			<button type="submit" class="primary"><svg th:replace="~{fragments :: icon-plus}"></svg>Upload</button>
+		</div>
+	</form>
+
+	<section aria-labelledby="cv-list-heading">
+		<h2 id="cv-list-heading" class="section-heading">Uploaded versions</h2>
+		<div th:if="${cvs.isEmpty()}" class="empty">
+			<p class="empty-title">No CVs yet</p>
+			<p class="empty-text">Upload the first version above. Recording which CV you sent helps when a recruiter
+				calls back weeks later.</p>
+		</div>
+		<ul th:unless="${cvs.isEmpty()}" class="file-list">
+			<li th:each="cv : ${cvs}" class="card file">
+				<div>
+					<h3 th:text="${cv.label}">Backend CV, Nov 2026</h3>
+					<p class="hint">
+						<span th:text="${cv.originalFilename}">cv.pdf</span> ·
+						<span th:text="${cv.sizeBytes < 1048576} ? ${#numbers.formatDecimal(cv.sizeBytes / 1024.0, 1, 0)} + ' KB' : ${#numbers.formatDecimal(cv.sizeBytes / 1048576.0, 1, 1)} + ' MB'">120 KB</span> ·
+						uploaded <time th:datetime="${cv.uploadedAt}" th:text="${#temporals.format(cv.uploadedAt.atZone(zone), 'd MMM yyyy')}">2 Nov 2026</time>
+					</p>
+				</div>
+				<a class="button" th:href="@{/cvs/{id}/download(id=${cv.id})}">Download</a>
+			</li>
+		</ul>
+	</section>
+</main>
+</body>
+</html>

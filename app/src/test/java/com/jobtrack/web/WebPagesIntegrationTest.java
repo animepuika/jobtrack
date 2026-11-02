@@ -177,7 +177,7 @@ class WebPagesIntegrationTest {
 
 		this.mvc.perform(get("/applications/{id}", application.getId()).with(user(other)))
 			.andExpect(status().isNotFound())
-			.andExpect(content().string(containsString("We can't find that application")));
+			.andExpect(content().string(containsString("We can't find that <span>application</span>")));
 	}
 
 	@Test

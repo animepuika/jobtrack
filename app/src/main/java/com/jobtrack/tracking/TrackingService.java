@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.jobtrack.documents.CvService;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -28,11 +30,15 @@ public class TrackingService {
 
 	private final JobApplicationRepository applications;
 
+	private final CvService cvVersions;
+
 	private final Clock clock;
 
-	public TrackingService(TrackedJobRepository jobs, JobApplicationRepository applications, Clock clock) {
+	public TrackingService(TrackedJobRepository jobs, JobApplicationRepository applications, CvService cvVersions,
+			Clock clock) {
 		this.jobs = jobs;
 		this.applications = applications;
+		this.cvVersions = cvVersions;
 		this.clock = clock;
 	}
 
@@ -133,8 +139,44 @@ public class TrackingService {
 
 	public JobApplication setArchived(long ownerId, long applicationId, boolean archived) {
 		JobApplication application = findOwned(ownerId, applicationId);
-		application.setArchived(archived, Instant.now(this.clock));
+		application.setArchived(archived, today(), Instant.now(this.clock));
 		return application;
+	}
+
+	/**
+	 * Records which CV version was sent, or clears it with {@code null}. The CV must
+	 * belong to the same user.
+	 */
+	public JobApplication useCvVersion(long ownerId, long applicationId, Long cvVersionId) {
+		JobApplication application = findOwned(ownerId, applicationId);
+		if (cvVersionId != null) {
+			this.cvVersions.get(ownerId, cvVersionId);
+		}
+		application.useCvVersion(cvVersionId, Instant.now(this.clock));
+		return application;
+	}
+
+	/**
+	 * The user's applications with these IDs, for modules that refer to applications
+	 * by ID. Unknown or other users' IDs are left out.
+	 */
+	@Transactional(readOnly = true)
+	public Map<Long, JobApplication> findOwnedByIds(long ownerId, Collection<Long> applicationIds) {
+		if (applicationIds.isEmpty()) {
+			return Map.of();
+		}
+		return this.applications.findOwnedByIds(ownerId, applicationIds)
+			.stream()
+			.collect(Collectors.toMap(JobApplication::getId, (application) -> application));
+	}
+
+	/**
+	 * Fails with {@link ApplicationNotFoundException} unless the user owns the
+	 * application.
+	 */
+	@Transactional(readOnly = true)
+	public void requireOwned(long ownerId, long applicationId) {
+		findOwned(ownerId, applicationId);
 	}
 
 	@Transactional(readOnly = true)

@@ -3,8 +3,11 @@ package com.jobtrack.web;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.jobtrack.jobsource.JobSource;
+import com.jobtrack.reminders.Reminder;
+import com.jobtrack.reminders.ReminderService;
 import com.jobtrack.tracking.ApplicationFilter;
 import com.jobtrack.tracking.JobApplication;
 import com.jobtrack.tracking.Stage;
@@ -28,13 +31,18 @@ class DashboardController {
 
 	private final TrackingService tracking;
 
+	private static final int UPCOMING_REMINDERS = 6;
+
 	private final JobSource jobSource;
+
+	private final ReminderService reminders;
 
 	private final Clock clock;
 
-	DashboardController(TrackingService tracking, JobSource jobSource, Clock clock) {
+	DashboardController(TrackingService tracking, JobSource jobSource, ReminderService reminders, Clock clock) {
 		this.tracking = tracking;
 		this.jobSource = jobSource;
+		this.reminders = reminders;
 		this.clock = clock;
 	}
 
@@ -70,6 +78,11 @@ class DashboardController {
 		model.addAttribute("filtered", stage != null || text != null || archived);
 		model.addAttribute("links", new Links(stage, text, archived));
 		model.addAttribute("zone", this.clock.getZone());
+		List<Reminder> upcoming = this.reminders.upcoming(user.getId(), UPCOMING_REMINDERS);
+		model.addAttribute("upcoming", upcoming);
+		model.addAttribute("reminderApplications", this.tracking.findOwnedByIds(user.getId(),
+				upcoming.stream().map(Reminder::getApplicationId).collect(Collectors.toSet())));
+		model.addAttribute("now", this.reminders.now());
 		return "dashboard";
 	}
 

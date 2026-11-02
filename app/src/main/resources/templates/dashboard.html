@@ -157,7 +157,26 @@
 				</nav>
 			</section>
 
-			<aside class="side-column" aria-labelledby="activity-heading">
+			<aside class="side-column">
+				<section class="card" aria-labelledby="upcoming-heading">
+					<h2 id="upcoming-heading">Coming up</h2>
+					<p th:if="${upcoming.isEmpty()}" class="hint">No reminders. Add one from an application page.</p>
+					<ul th:unless="${upcoming.isEmpty()}" class="reminder-list">
+						<li th:each="r : ${upcoming}" class="reminder" th:classappend="${r.isOverdue(now)} ? 'overdue'"
+							th:with="app=${reminderApplications.get(r.applicationId)}">
+							<p class="reminder-when">
+								<time th:datetime="${r.dueAt}" th:text="${#temporals.format(r.dueAt.atZone(zone), 'EEE d MMM, HH:mm')}">Mon 9 Nov, 09:00</time>
+								<span th:if="${r.isOverdue(now)}" class="overdue-tag">Overdue</span>
+							</p>
+							<a th:if="${app}" th:href="@{/applications/{id}(id=${r.applicationId})}" th:text="${app.job.title}">Junior Java Developer</a>
+							<p class="note" th:text="${r.note}">Email Sara</p>
+							<form th:action="@{/reminders/{id}/complete(id=${r.id})}" method="post">
+								<input type="hidden" name="returnTo" value="/">
+								<button type="submit"><svg th:replace="~{fragments :: icon-check}"></svg>Done</button>
+							</form>
+						</li>
+					</ul>
+				</section>
 				<div>
 					<h2 id="activity-heading">Recent activity</h2>
 					<p class="hint">Latest 8 changes across all jobs</p>
@@ -177,6 +196,13 @@
 						</span>
 					</li>
 				</ol>
+				<section class="card" aria-labelledby="files-heading">
+					<h2 id="files-heading">Your files</h2>
+					<ul class="link-list">
+						<li><a th:href="@{/cvs}">CV versions</a></li>
+						<li><a th:href="@{/export}">Download all your records</a> <span class="hint">(JSON, for backup)</span></li>
+					</ul>
+				</section>
 			</aside>
 		</div>
 	</th:block>

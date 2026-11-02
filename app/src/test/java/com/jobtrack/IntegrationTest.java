@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Import;
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest(properties = "jobtrack.hiringcafe.enabled=false")
+@SpringBootTest(properties = { "jobtrack.hiringcafe.enabled=false", "jobtrack.documents.directory=target/test-documents" })
 @Import(TestcontainersConfiguration.class)
 public @interface IntegrationTest {
 

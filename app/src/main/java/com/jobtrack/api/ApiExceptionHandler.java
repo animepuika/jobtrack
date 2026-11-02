@@ -3,7 +3,9 @@ package com.jobtrack.api;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.jobtrack.documents.CvNotFoundException;
 import com.jobtrack.jobsource.JobSourceException;
+import com.jobtrack.reminders.ReminderNotFoundException;
 import com.jobtrack.tracking.ApplicationNotFoundException;
 import com.jobtrack.tracking.DuplicateJobException;
 import com.jobtrack.tracking.StageChangeNotAllowedException;
@@ -32,6 +34,16 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler
 	ProblemDetail handle(ApplicationNotFoundException ex) {
+		return problem(HttpStatus.NOT_FOUND, "Not found", ex.getMessage());
+	}
+
+	@ExceptionHandler
+	ProblemDetail handle(CvNotFoundException ex) {
+		return problem(HttpStatus.NOT_FOUND, "Not found", ex.getMessage());
+	}
+
+	@ExceptionHandler
+	ProblemDetail handle(ReminderNotFoundException ex) {
 		return problem(HttpStatus.NOT_FOUND, "Not found", ex.getMessage());
 	}
 

@@ -21,6 +21,12 @@ interface JobApplicationRepository extends JpaRepository<JobApplication, Long> {
 
 	@Query("""
 			select a from JobApplication a join fetch a.job j
+			where a.id in :ids and j.ownerId = :ownerId
+			""")
+	List<JobApplication> findOwnedByIds(Long ownerId, Collection<Long> ids);
+
+	@Query("""
+			select a from JobApplication a join fetch a.job j
 			where j.ownerId = :ownerId
 			  and (:includeArchived = true or a.archived = false)
 			  and (:stage is null or a.stage = :stage)

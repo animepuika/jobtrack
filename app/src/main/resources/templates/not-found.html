@@ -5,9 +5,9 @@
 <header th:replace="~{fragments :: header}"></header>
 <main id="main" class="narrow-sm">
 	<p class="eyebrow">Not found</p>
-	<h1>We can't find that application</h1>
-	<p class="lead">The link may be mistyped, or the application isn't in your
-		account. Archived jobs are still here; turn on Show archived on the dashboard to see them.</p>
+	<h1>We can't find that <span th:text="${thing} ?: 'application'">application</span></h1>
+	<p class="lead">The link may be mistyped, or it isn't in your account. Archived jobs are still here; turn on
+		Show archived on the dashboard to see them.</p>
 	<a class="button primary" th:href="@{/}"><svg th:replace="~{fragments :: icon-back}"></svg>Back to your applications</a>
 </main>
 </body>

@@ -1,0 +1,12 @@
+# Keep build output, personal files and local settings out of the image build.
+target/
+data/
+*.log
+.env
+.env.*
+.idea/
+.vscode/
+*.iml
+README.md
+compose.yaml
+Dockerfile

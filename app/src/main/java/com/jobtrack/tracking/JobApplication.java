@@ -49,6 +49,13 @@ public class JobApplication {
 	@Column(nullable = false)
 	private boolean archived;
 
+	@Column(name = "archived_on")
+	private LocalDate archivedOn;
+
+	/** The CV version sent, by ID only: CVs belong to the documents module. */
+	@Column(name = "cv_version_id")
+	private Long cvVersionId;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
@@ -104,8 +111,17 @@ public class JobApplication {
 		this.updatedAt = now;
 	}
 
-	void setArchived(boolean archived, Instant now) {
+	void setArchived(boolean archived, LocalDate today, Instant now) {
+		if (archived == this.archived) {
+			return;
+		}
 		this.archived = archived;
+		this.archivedOn = archived ? today : null;
+		this.updatedAt = now;
+	}
+
+	void useCvVersion(Long cvVersionId, Instant now) {
+		this.cvVersionId = cvVersionId;
 		this.updatedAt = now;
 	}
 
@@ -139,6 +155,14 @@ public class JobApplication {
 
 	public boolean isArchived() {
 		return archived;
+	}
+
+	public LocalDate getArchivedOn() {
+		return archivedOn;
+	}
+
+	public Long getCvVersionId() {
+		return cvVersionId;
 	}
 
 	public Instant getCreatedAt() {

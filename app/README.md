@@ -1,9 +1,9 @@
 # JobTrack application
 
 A Spring Boot web app for tracking job applications: save jobs by hand or from a
-HiringCafe search, move each one through its stages, keep notes, and see
-everything on a dashboard. It covers milestones 1–5 of the
-[project plan](../docs/project-plan.md).
+HiringCafe search, move each one through its stages, keep notes, record which CV
+you sent, set follow-up reminders, export your records, and see everything on a
+dashboard. It covers milestones 1–7 of the [project plan](../docs/project-plan.md).
 
 Built with Java 25, Spring Boot 4.1.2, PostgreSQL, Flyway, Spring Data JPA,
 Spring Security, and Thymeleaf. The interface follows a "quiet utility" design made
@@ -33,7 +33,16 @@ JOBTRACK_USERNAME=you JOBTRACK_PASSWORD='a long password' ./mvnw spring-boot:run
 ```
 
 The account is created on the first start. Your records live in the
-`jobtrack-data` Docker volume, outside Git.
+`jobtrack-data` Docker volume and uploaded CVs in `app/data/`, both outside Git.
+
+**Everything in containers** (PostgreSQL plus the app image built from the
+[Dockerfile](Dockerfile)):
+
+```bash
+JOBTRACK_USERNAME=you JOBTRACK_PASSWORD='a long password' docker compose --profile app up --build
+```
+
+Uploaded CVs then live in the `jobtrack-documents` volume.
 
 ### Configuration
 
@@ -43,7 +52,8 @@ The account is created on the first start. Your records live in the
 | `JOBTRACK_DB_USERNAME` / `JOBTRACK_DB_PASSWORD` | `jobtrack` / `jobtrack` | Database login (local container only) |
 | `JOBTRACK_USERNAME` / `JOBTRACK_PASSWORD` | none | Account to create at startup; password needs 8+ characters |
 | `JOBTRACK_HIRINGCAFE_ENABLED` | `true` (`false` in the demo profile) | Live job search |
-| `JOBTRACK_TIME_ZONE` | `Europe/Riga` | Decides what "today" is |
+| `JOBTRACK_TIME_ZONE` | `Europe/Riga` | Decides what "today" is and how reminder times are entered and shown |
+| `JOBTRACK_DOCUMENTS_DIR` | `data/documents` | Folder for uploaded CV files |
 
 ## Test it
 
@@ -51,8 +61,9 @@ The account is created on the first start. Your records live in the
 ./mvnw test
 ```
 
-91 tests: business rules, URL handling, the HiringCafe adapter against a local fake
-server, the page states (welcome, paging, errors, final stages), and integration tests that run the whole app against a real PostgreSQL
+115 tests: business rules, URL handling, the HiringCafe adapter against a local fake
+server, the page states (welcome, paging, errors, final stages), CV upload checks
+and private downloads, reminders, the export, and integration tests that run the whole app against a real PostgreSQL
 started by Testcontainers. No test calls the real HiringCafe.
 
 Without Docker, point the tests at an existing PostgreSQL instead:
@@ -63,10 +74,17 @@ JOBTRACK_TEST_TESTCONTAINERS=false JOBTRACK_DB_URL=jdbc:postgresql://localhost:5
 
 ## How it is organized
 
+GitHub Actions ([ci.yml](../.github/workflows/ci.yml)) runs the same tests on every
+push and pull request, with Testcontainers starting PostgreSQL 18, then builds the
+Docker image and checks that it contains only the app.
+
 ```text
 com.jobtrack
 ├── tracking    the core: jobs, applications, stage rules, history (no web code)
 ├── jobsource   HiringCafe adapter behind a JobSource interface, and job import
+├── documents   CV versions: upload checks, private file storage, ownership
+├── reminders   follow-up reminders; refers to applications by ID only
+├── export      collects one user's records into a JSON export
 ├── user        accounts, password hashing, sign-in lookup
 ├── api         JSON API under /api (HTTP Basic, no session)
 ├── web         Thymeleaf pages (login form, session, CSRF)
@@ -88,6 +106,28 @@ Flyway creates the schema from
 | `tracked_job` | What the job is: title, company, location, link, source and provider ID |
 | `job_application` | The user's progress on it: stage, applied date, archived flag |
 | `application_event` | History: created, each stage change, notes. Only added to, never edited |
+| `cv_version` | Uploaded CV details and a random storage key; the file itself is in document storage |
+| `reminder` | Follow-ups with a due time and a done time. Linked to applications by ID only, so this module can later become its own service |
+
+Migrations: [V1](src/main/resources/db/migration/V1__create_tracker_tables.sql) creates
+the tracker, [V2](src/main/resources/db/migration/V2__add_cv_versions_reminders_archive_date.sql)
+adds CVs, reminders, the archive date, and the CV used per application.
+
+### CV files
+
+- Only PDF and Word (`.docx`) files up to 5 MB, checked by their first bytes as well
+  as their name.
+- Stored under a random name in a private folder (`data/documents`, ignored by Git),
+  never under the uploaded file name.
+- Served only to their owner, always as a download with `nosniff`, never inline.
+- The [DocumentStorage](src/main/java/com/jobtrack/documents/DocumentStorage.java)
+  interface lets private Azure Blob Storage replace the local folder later.
+
+### Reminders
+
+Reminders show on the dashboard ("Coming up") and the application page, soonest
+first, with overdue ones marked. They are entered in the configured time zone and
+stored as instants. Nothing is sent by email or text message.
 
 Rules the database enforces as a last line of defense: no blank titles, one
 application per job, and no duplicate jobs per user (same HiringCafe ID, or the
@@ -121,6 +161,12 @@ All endpoints need HTTP Basic authentication. Errors are
 | `POST /api/applications/{id}/archive`, `/restore` | Hide or show on the dashboard |
 | `GET /api/sources/hiringcafe/jobs?keywords=&location=&workplace=&seniority=` | Live search |
 | `POST /api/imports/hiringcafe` | Track a search result (201 new, 200 already tracked) |
+| `GET /api/cv-versions`, `POST /api/cv-versions` | List, or upload as multipart `label` + `file` |
+| `GET /api/cv-versions/{id}/file` | Download a CV |
+| `PUT /api/applications/{id}/cv-version` | Record the CV sent: `{"cvVersionId": 3}`, or `null` to clear |
+| `GET /api/applications/{id}/reminders`, `POST` same path | List, or add: `{"date": "2026-11-09", "time": "10:00", "note": "…"}` |
+| `PATCH /api/reminders/{id}`, `POST /api/reminders/{id}/complete` | Move or finish a reminder |
+| `GET /api/export` | Download all your records as JSON (the page version is `/export`) |
 
 Example:
 
@@ -149,5 +195,5 @@ Only jobs the user chooses are saved. When search fails, manual entry still work
 
 ## Not built yet
 
-CV uploads, reminders, data export, a Docker image, CI, and the Azure deployment
-are later milestones (6–10).
+The temporary Azure deployment, splitting reminders into their own service, and the
+portfolio release are milestones 8–10.

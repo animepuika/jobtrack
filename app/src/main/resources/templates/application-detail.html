@@ -10,8 +10,8 @@
 	<form th:if="${jobApplication.archived}" th:action="@{/applications/{id}/restore(id=${jobApplication.id})}"
 		method="post" class="flash archived">
 		<svg th:replace="~{fragments :: icon-archive}"></svg>
-		<span class="flash-body"><strong>This application is archived.</strong> It's hidden from your dashboard unless
-			you show archived jobs. Nothing is deleted.</span>
+		<span class="flash-body"><strong th:text="${jobApplication.archivedOn} ? 'Archived on ' + ${#temporals.format(jobApplication.archivedOn, 'd MMM yyyy')} + '.' : 'This application is archived.'">Archived on 30 Oct 2026.</strong>
+			It's hidden from your dashboard unless you show archived jobs. Nothing is deleted.</span>
 		<button type="submit">Restore</button>
 	</form>
 
@@ -141,6 +141,89 @@
 					<dd th:text="${jobApplication.appliedOn} ? ${#temporals.format(jobApplication.appliedOn, 'd MMM yyyy')} : 'Not yet'">Not yet</dd>
 				</dl>
 			</section>
+
+			<section class="card" aria-labelledby="reminders-heading">
+				<h2 id="reminders-heading">Reminders</h2>
+				<p th:if="${openReminders.isEmpty()}" class="hint">No open reminders. Add one to remember a follow-up.</p>
+				<ul th:unless="${openReminders.isEmpty()}" class="reminder-list">
+					<li th:each="r : ${openReminders}" class="reminder" th:classappend="${r.isOverdue(now)} ? 'overdue'">
+						<p class="reminder-when">
+							<time th:datetime="${r.dueAt}" th:text="${#temporals.format(r.dueAt.atZone(zone), 'EEE d MMM yyyy, HH:mm')}">Mon 9 Nov 2026, 09:00</time>
+							<span th:if="${r.isOverdue(now)}" class="overdue-tag">Overdue</span>
+						</p>
+						<p class="note" th:text="${r.note}">Email Sara if I hear nothing</p>
+						<div class="actions">
+							<form th:action="@{/reminders/{id}/complete(id=${r.id})}" method="post">
+								<input type="hidden" name="returnTo" th:value="'/applications/' + ${jobApplication.id}">
+								<button type="submit"><svg th:replace="~{fragments :: icon-check}"></svg>Done</button>
+							</form>
+							<details class="reschedule">
+								<summary>Move</summary>
+								<form th:action="@{/reminders/{id}/reschedule(id=${r.id})}" method="post" class="inline-form">
+									<input type="hidden" name="returnTo" th:value="'/applications/' + ${jobApplication.id}">
+									<div class="field">
+										<label th:for="'move-date-' + ${r.id}">Date</label>
+										<input th:id="'move-date-' + ${r.id}" type="date" name="date" th:min="${today}"
+											th:value="${#temporals.format(r.dueAt.atZone(zone), 'yyyy-MM-dd')}" required>
+									</div>
+									<div class="field">
+										<label th:for="'move-time-' + ${r.id}">Time</label>
+										<input th:id="'move-time-' + ${r.id}" type="time" name="time"
+											th:value="${#temporals.format(r.dueAt.atZone(zone), 'HH:mm')}">
+									</div>
+									<button type="submit">Save</button>
+								</form>
+							</details>
+						</div>
+					</li>
+				</ul>
+				<form th:action="@{/applications/{id}/reminders(id=${jobApplication.id})}" method="post" class="stack add-reminder">
+					<div class="field">
+						<label for="reminder-note">New reminder</label>
+						<textarea id="reminder-note" name="note" rows="2" maxlength="500" required
+							placeholder="Follow up with the recruiter"></textarea>
+					</div>
+					<div class="inline-form">
+						<div class="field">
+							<label for="reminder-date">Date</label>
+							<input id="reminder-date" type="date" name="date" th:min="${today}" th:value="${today.plusDays(7)}" required>
+						</div>
+						<div class="field">
+							<label for="reminder-time">Time</label>
+							<input id="reminder-time" type="time" name="time" value="09:00">
+						</div>
+						<button type="submit">Add reminder</button>
+					</div>
+				</form>
+				<details th:unless="${doneReminders.isEmpty()}" class="done-reminders">
+					<summary>Done (<span th:text="${doneReminders.size()}">1</span>)</summary>
+					<ul class="reminder-list">
+						<li th:each="r : ${doneReminders}" class="reminder done">
+							<p class="reminder-when"><time th:datetime="${r.dueAt}" th:text="${#temporals.format(r.dueAt.atZone(zone), 'd MMM yyyy')}">2 Nov 2026</time></p>
+							<p class="note" th:text="${r.note}">Sent the thank-you email</p>
+						</li>
+					</ul>
+				</details>
+			</section>
+
+			<section class="card" aria-labelledby="cv-heading">
+				<h2 id="cv-heading">CV sent</h2>
+				<p th:if="${currentCv}"><a th:href="@{/cvs/{id}/download(id=${currentCv.id})}" th:text="${currentCv.label}">Backend CV, Nov 2026</a></p>
+				<p th:unless="${currentCv}" class="hint">No CV recorded for this application.</p>
+				<form th:unless="${cvs.isEmpty()}" th:action="@{/applications/{id}/cv(id=${jobApplication.id})}" method="post" class="inline-form">
+					<div class="field">
+						<label for="cv-select">Version</label>
+						<select id="cv-select" name="cvVersionId">
+							<option value="">None</option>
+							<option th:each="cv : ${cvs}" th:value="${cv.id}" th:text="${cv.label}"
+								th:selected="${currentCv != null and cv.id == currentCv.id}">Backend CV</option>
+						</select>
+					</div>
+					<button type="submit">Save</button>
+				</form>
+				<p class="hint"><a th:href="@{/cvs}" th:text="${cvs.isEmpty()} ? 'Upload a CV' : 'Manage CVs'">Manage CVs</a></p>
+			</section>
+
 			<form th:unless="${jobApplication.archived}" class="archive-box"
 				th:action="@{/applications/{id}/archive(id=${jobApplication.id})}" method="post">
 				<button type="submit" class="archive"><svg th:replace="~{fragments :: icon-archive}"></svg>Archive</button>
