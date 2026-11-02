@@ -13,8 +13,8 @@ observed), **blocked**, or still **open**.
 | Older Javas | Temurin 21.0.8 and Oracle Java 8 (1.8.0_511) are still installed, but are no longer what `java` resolves to | Left in place |
 | Git | 2.47.1, user name configured | Verified |
 | Docker CLI / Compose | Docker 28.4.0, Compose v2.39.2 (Docker Desktop 4.46.0) | Verified |
-| Docker engine | Docker Desktop crashes during startup, so no engine is available | Blocked |
-| PostgreSQL container | Not attempted; needs the Docker engine | Open |
+| Docker engine | Crashed at startup on November 1 (below); running on November 2, Engine 28.4.0 | Verified |
+| PostgreSQL container | PostgreSQL 18.6 via Testcontainers (all tests) and via `compose.yaml` | Verified |
 
 ### The Java version mismatch (fixed)
 
@@ -109,12 +109,27 @@ Seniority, Technical tools, Workplace, Years of experience, View & apply), then
   in Greece and across Europe. Do not assume results are inside the requested place.
 - `_meta` is a provider extension and could change; keep a fallback to the text.
 
-### Documentation recheck
+### Documentation and terms recheck
 
-The documentation page returns HTTP 403 to non-browser clients and shows a
-Cloudflare verification page in the built-in browser. It was not rechecked;
-the live calls above are the current evidence. Review the page, and the terms,
-in an ordinary browser before Milestone 5.
+The pages block non-browser clients, so they were read in an ordinary browser on
+November 2, 2026: the connector documentation (last updated October 22, 2026) and
+the terms (last updated October 27, 2026). Findings that matter for JobTrack:
+
+- **Protocol:** Streamable HTTP with JSON responses, no authentication; methods
+  `initialize`, `tools/list`, `tools/call`, `ping`. This matches the adapter.
+- **`search_jobs`:** `search` is optional; `limit` is 1–25 (default 10); results
+  return **one job per company**, which explains 8 results for a limit of 10.
+- **Rate limits:** per IP address, with HTTP 429 and `Retry-After` for heavy
+  automated use. The adapter does not retry a 429 and shows the wait.
+- **Read-only:** no saved jobs, applications or profile are exposed, as planned.
+- **Attribution:** job links carry tracking parameters so HiringCafe can count
+  traffic from Claude. JobTrack is not Claude, so it stores links without the
+  `utm_*` parameters rather than reporting traffic under Claude's name.
+- **Terms, section 6:** material may be used for your own personal use; it must not
+  be republished, sold, reproduced or redistributed. JobTrack saves only the jobs
+  you choose, for your own tracker. The public repository, tests and demo use
+  fictional data only, and the demo has live search turned off. Do not publish
+  screenshots, recordings or exports containing real HiringCafe listings.
 
 ### Network block observed on November 2, 2026
 
@@ -127,8 +142,13 @@ live HiringCafe search does not work on this network until the filter allows the
 domain. The app reports this as "HiringCafe could not be reached" and keeps manual
 entry working. This is a network setting, not an application fault.
 
-## Remaining to finish Milestone 0
+Later on November 2, with a VPN, `hiringcafe.com` resolved to Cloudflare again with a
+Google Trust Services certificate. A live search through JobTrack's own API returned
+97 matches; importing the first result twice created one application and then
+returned the same one; a repeated search marked it as tracked. The test database
+holding that real listing was deleted afterwards.
 
-1. Fix Docker Desktop startup, then start PostgreSQL in a throwaway container and
-   run a query.
-2. Add the Maven Wrapper when the first Maven project is created (Milestone 1 or 2).
+## Milestone 0 status
+
+Complete. Docker, PostgreSQL 18, the Maven Wrapper (added with the app), and the
+live HiringCafe connection are all verified.

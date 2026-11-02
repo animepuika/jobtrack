@@ -26,6 +26,7 @@ services:
         condition: service_healthy
     environment:
       JOBTRACK_DB_URL: jdbc:postgresql://postgres:5432/jobtrack
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
       JOBTRACK_USERNAME: ${JOBTRACK_USERNAME:-}
       JOBTRACK_PASSWORD: ${JOBTRACK_PASSWORD:-}
     ports:

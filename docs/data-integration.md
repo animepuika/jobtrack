@@ -83,9 +83,11 @@ check on November 1, 2026 confirmed both tools without authentication and
 recorded their actual response shapes; see
 [Milestone 0 notes](milestone-0-notes.md#hiringcafe-mcp-feasibility-check). The
 adapter is now implemented in `app/` and tested against fictional responses; see
-[the app README](../app/README.md#hiringcafe-integration). A live search from the app
-has not succeeded yet, because a network DNS filter blocked the domain on
-November 2. Availability and limits can change.
+[the app README](../app/README.md#hiringcafe-integration). A live search and
+de-duplicated import through the app succeeded on November 2, and the current
+documentation and terms were reviewed the same day; see
+[the notes](milestone-0-notes.md#documentation-and-terms-recheck). Availability and
+limits can change.
 
 ## Reliability rules to implement
 
