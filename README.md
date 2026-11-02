@@ -1,72 +1,101 @@
 # JobTrack
 
-A personal job application and interview tracker, built to learn Java, Spring Boot,
-PostgreSQL, Docker, microservices, and Microsoft Azure.
+![CI](https://github.com/animepuika/jobtrack/actions/workflows/ci.yml/badge.svg)
 
-**Status:** milestones 1–7 are built in [app/](app/README.md): manual tracking,
-stage rules and history, a JSON API, a signed-in dashboard, PostgreSQL storage,
-HiringCafe search and import, private CV versions, reminders, a JSON export, a
-Docker image, and a GitHub Actions pipeline. 115 automated tests pass against a real
-PostgreSQL. Milestones 8–10 (temporary Azure deployment, reminder microservice,
-portfolio release) are not started. The interface follows a Claude Design handoff
-made from [docs/design-prompt.md](docs/design-prompt.md).
+A personal job application tracker, built step by step to learn Java 25, Spring
+Boot 4, PostgreSQL, Docker, event-driven microservices and Azure. Everything in
+this repository uses fictional data.
 
-The [lessons/](lessons/) folder holds the first two plain-Java lessons.
+## What it does
 
-## Purpose
+- **Track applications** through clear stages (Saved → Applied → Interview → Offer
+  → Accepted, or Rejected / Withdrawn), with a dated history and notes. Stages only
+  move forward, and the rules are enforced in the domain model and the database.
+- **Search HiringCafe** live and track the jobs you choose, without duplicates.
+- **Compare jobs with your CV**: skills are read from your PDF or Word CV on your
+  own machine, and each search result shows which of its required skills you have
+  and which are missing. Rule-based and explainable; no AI service is involved.
+- **Keep CV versions** privately and record which one you sent.
+- **Set follow-up reminders**, handled by a separate reminder service.
+- **Export** all of your records as JSON.
 
-Keep selected jobs, application stages, interview notes, reminders, and CV versions
-in one place. Use the project personally and show its design and implementation
-in a public portfolio.
+## Architecture
 
-The public repository and portfolio examples will contain fictional data. Actual
-applications, CVs, credentials, and database exports stay outside version control.
+```mermaid
+flowchart LR
+    B[Browser] -->|pages, login, CSRF| T[Tracker<br/>Spring Boot]
+    C[API client] -->|JSON, HTTP Basic| T
+    T --> TDB[(Tracker PostgreSQL<br/>jobs, applications, history,<br/>CV metadata, skills, outbox)]
+    T --> F[Private CV files]
+    T -->|MCP over HTTP| H[HiringCafe]
+    T -->|outbox publisher| Q[[Azure Storage Queue<br/>Azurite locally]]
+    Q --> R[Reminder service<br/>Spring Boot]
+    R --> RDB[(Reminder PostgreSQL)]
+    T -->|internal API, token| R
+```
 
-## Planned workflow
+- **Tracker** ([app/](app/README.md)): a modular Spring Boot application with
+  tracking, job source, documents, matching, reminders and export modules, server-
+  rendered pages and a JSON API.
+- **Reminder service** ([reminder-service/](reminder-service/README.md)): owns
+  reminders and their database. The tracker sends changes through a transactional
+  outbox and a queue, and the service handles duplicates and out-of-order messages
+  with event IDs and versions ([docs/events.md](docs/events.md)).
 
-1. Add a job manually, or search HiringCafe through its documented connector.
-2. Choose a result to track and review the details before saving it.
-3. Record application progress, CV version, notes, and follow-up dates.
-4. View upcoming interviews and reminders on a dashboard.
-5. Export personal tracker records for backup or migration.
+## Run it
 
-See [the data integration blueprint](docs/data-integration.md) for sources,
-relationships, integration limits, and public demo behavior.
+You need Docker and JDK 25. From `app/`:
 
-See [the project and learning plan](docs/project-plan.md) for scope, estimates,
-completion criteria, architecture, Azure labs, and the first lesson.
+```bash
+docker compose up -d --build
+./mvnw spring-boot:test-run
+```
 
-See [the app README](app/README.md) to run, test, and understand the built
-application.
+The second command starts the tracker with fictional demo data at
+<http://localhost:8080> (sign in as `demo` / `demo-password`). For personal use,
+see [app/README.md](app/README.md#run-it).
 
-## Learning sequence
+## Tests and CI
 
-Each milestone will include an explanation, a small implementation, a way to run
-and inspect it, and an exercise to complete independently.
+About 150 automated tests across both services, run on every push by
+[GitHub Actions](.github/workflows/ci.yml): domain rules, the HiringCafe adapter
+against a local fake server, CV reading and skill matching, the outbox under queue
+failures, the reminder service's duplicate and ordering rules, page behaviour, and
+integration tests against real PostgreSQL 18 and Azurite started by Testcontainers.
+CI also builds both Docker images and checks that they contain only the app.
 
-| Milestone | Build | Learn |
-| --- | --- | --- |
-| 0 | Verified local toolchain and a HiringCafe feasibility check | Java tools, Git, Docker, external dependency checks |
-| 1 | Jobs and application stages in memory | Java objects, enums, collections, business rules |
-| 2 | A Spring Boot API | HTTP, JSON, dependency injection, validation, error responses |
-| 3 | Persistent tracker records | SQL, PostgreSQL, relationships, migrations, integration tests |
-| 4 | Dashboard and login | Thymeleaf, sessions, authentication, record ownership |
-| 5 | HiringCafe search and selected-job imports | MCP, external service calls, data mapping, duplicates, timeouts |
-| 6 | Private CV attachments, reminders, and export | File storage, access checks, scheduling, time zones |
-| 7 | Docker and CI | Reproducible environments, automated builds and tests |
-| 8 | Temporary Azure deployment | Infrastructure, identity, logs, cost inspection, resource cleanup |
-| 9 | Extract the reminder service | Service boundaries, events, retries, duplicate event handling |
-| 10 | Portfolio release | Documentation, diagrams, screenshots, walkthrough recording |
+## Design notes
 
-Start with one application containing clear modules. When the reminder module
-becomes a separate service, it will own its own storage and receive events rather
-than accessing the tracker's database tables.
+The [case study](docs/case-study.md) explains the main decisions and their
+trade-offs, the problems found during the build and how they were fixed, and what
+could be improved. Other documents:
 
-## Hosting approach
+| Document | About |
+| --- | --- |
+| [docs/project-plan.md](docs/project-plan.md) | Learning plan, scope, milestones |
+| [docs/data-integration.md](docs/data-integration.md) | Data ownership and the HiringCafe integration |
+| [docs/events.md](docs/events.md) | Reminder events, guarantees and failure handling |
+| [docs/azure-lab.md](docs/azure-lab.md) | Temporary Azure deployment: cost checks, steps, cleanup |
+| [docs/milestone-0-notes.md](docs/milestone-0-notes.md) | Toolchain and provider checks, with dates |
+| [docs/design-prompt.md](docs/design-prompt.md) | The UI brief given to Claude Design |
+| [lessons/](lessons/) | The first two plain-Java lessons |
 
-Develop locally first. Use Azure for planned learning and demonstration sessions,
-record evidence of the deployment, and remove temporary project resources after
-use. A permanently running public service is not a requirement.
+## Privacy
 
-The target is no hosting spend. Azure eligibility, resource choices, and measured
-usage must be checked before deployment; this blueprint is not a zero-cost guarantee.
+Real CVs, application records, database exports and credentials stay out of Git
+and out of container images. CV text is read in memory and never stored; only skill
+names are kept. Live job search is off in the public demo, and no real job listings
+are published, in line with HiringCafe's terms.
+
+## Status
+
+| Milestone | Status |
+| --- | --- |
+| 0. Toolchain and provider checks | Done |
+| 1–5. Tracker, API, PostgreSQL, dashboard and login, HiringCafe | Done |
+| 6. CVs, reminders, export | Done |
+| 7. Docker and CI | Done |
+| 8. Temporary Azure deployment | Infrastructure files ready ([docs/azure-lab.md](docs/azure-lab.md)); deployment needs an Azure account |
+| 9. Reminder service | Done |
+| 10. Portfolio release | Write-up done; screenshots and a walkthrough video still to record |
+| Extra: CV skill matching | Done (added on request on November 2, 2026) |

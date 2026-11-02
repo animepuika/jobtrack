@@ -47,3 +47,32 @@ jobs:
           files="$(docker run --rm --entrypoint find ${{ matrix.service }}:ci /app -type f)"
           echo "$files"
           test "$files" = "/app/app.jar"
+
+  # After the tests pass on main, publish both images to GitHub's container registry
+  # so the Azure lab (infra/) can pull them. Pull requests never publish.
+  publish:
+    name: publish ${{ matrix.service }}
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: [app, reminder-service]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and push
+        working-directory: ${{ matrix.service }}
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/jobtrack-${{ matrix.service }}
+        run: |
+          IMAGE="$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --tag "$IMAGE:${{ github.sha }}" --tag "$IMAGE:latest" .
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
