@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Not found')}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main class="narrow">
+	<h1>Not found</h1>
+	<p>That application does not exist, or it is not yours.</p>
+	<p><a th:href="@{/}">Back to your applications</a></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,409 @@
+/* A plain, functional stylesheet. The visual design will be replaced after a
+   proper UI/UX pass; see docs/design-prompt.md. */
+
+:root {
+	--bg: #f6f7f9;
+	--surface: #ffffff;
+	--text: #1d2330;
+	--muted: #5d6677;
+	--border: #d9dde5;
+	--accent: #2456d6;
+	--accent-text: #ffffff;
+	--success-bg: #e6f4ea;
+	--success-text: #1e5b30;
+	--error-bg: #fdecea;
+	--error-text: #8a1c12;
+	--radius: 8px;
+	color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #12151b;
+		--surface: #1b2029;
+		--text: #e8ebf1;
+		--muted: #a0a9b8;
+		--border: #313847;
+		--accent: #7aa2ff;
+		--accent-text: #0d1117;
+		--success-bg: #173322;
+		--success-text: #a6e3b8;
+		--error-bg: #3a1714;
+		--error-text: #f5b4ac;
+		color-scheme: dark;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a {
+	color: var(--accent);
+}
+
+main {
+	max-width: 1100px;
+	margin: 0 auto;
+	padding: 24px 16px 48px;
+}
+
+main.narrow {
+	max-width: 560px;
+}
+
+h1 {
+	font-size: 1.75rem;
+	margin: 0 0 4px;
+}
+
+h2 {
+	font-size: 1.1rem;
+	margin: 0 0 12px;
+}
+
+.site-header {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px 24px;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	background: var(--surface);
+	border-bottom: 1px solid var(--border);
+}
+
+.site-header nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	align-items: center;
+}
+
+.brand {
+	font-weight: 700;
+	font-size: 1.15rem;
+	text-decoration: none;
+	color: var(--text);
+}
+
+.page-title {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: flex-start;
+	justify-content: space-between;
+	margin-bottom: 20px;
+}
+
+.subtitle,
+.muted {
+	color: var(--muted);
+}
+
+.subtitle {
+	margin: 0;
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 16px;
+	margin-bottom: 16px;
+}
+
+.stack {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+label {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-weight: 600;
+	font-size: 0.95rem;
+}
+
+label.checkbox {
+	flex-direction: row;
+	align-items: center;
+	font-weight: 400;
+}
+
+input,
+select,
+textarea,
+button,
+.button {
+	font: inherit;
+	border-radius: 6px;
+}
+
+input,
+select,
+textarea {
+	padding: 8px 10px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	font-weight: 400;
+}
+
+input[readonly] {
+	color: var(--muted);
+}
+
+input.invalid {
+	border-color: var(--error-text);
+}
+
+.field-error {
+	color: var(--error-text);
+	font-weight: 400;
+	font-size: 0.9rem;
+}
+
+button,
+.button {
+	display: inline-block;
+	padding: 8px 14px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	cursor: pointer;
+	text-decoration: none;
+}
+
+button.primary,
+.button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-text);
+}
+
+button.link {
+	border: none;
+	background: none;
+	color: var(--accent);
+	padding: 0;
+	text-decoration: underline;
+}
+
+button.subtle {
+	color: var(--muted);
+}
+
+form.inline {
+	display: inline;
+}
+
+.inline-form,
+.filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: flex-end;
+}
+
+.filters {
+	margin-bottom: 16px;
+}
+
+.flash {
+	padding: 10px 14px;
+	border-radius: var(--radius);
+	margin: 0 0 16px;
+}
+
+.flash p {
+	margin: 4px 0;
+}
+
+.flash.success {
+	background: var(--success-bg);
+	color: var(--success-text);
+}
+
+.flash.error {
+	background: var(--error-bg);
+	color: var(--error-text);
+}
+
+.stage-counts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+	gap: 8px;
+	margin-bottom: 24px;
+}
+
+.stage-counts .count {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 10px 12px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	text-decoration: none;
+	color: var(--text);
+}
+
+.stage-counts .count.selected {
+	outline: 2px solid var(--accent);
+}
+
+.stage-counts .number {
+	font-size: 1.5rem;
+	font-weight: 700;
+}
+
+.stage {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 0.85rem;
+	font-weight: 600;
+	border: 1px solid var(--border);
+	width: fit-content;
+}
+
+.columns {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 300px;
+	gap: 24px;
+}
+
+@media (max-width: 800px) {
+	.columns {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+table.applications {
+	width: 100%;
+	border-collapse: collapse;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+
+table.applications th,
+table.applications td {
+	text-align: left;
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--border);
+	vertical-align: top;
+}
+
+table.applications tr.archived {
+	opacity: 0.65;
+}
+
+.activity,
+.timeline,
+.results,
+.chips {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.activity li {
+	padding: 6px 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.timeline li {
+	display: grid;
+	grid-template-columns: 110px 1fr;
+	gap: 12px;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.timeline p {
+	margin: 0;
+}
+
+.timeline time {
+	color: var(--muted);
+}
+
+.note {
+	white-space: pre-wrap;
+}
+
+dl {
+	margin: 0;
+}
+
+dt {
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+
+dd {
+	margin: 0 0 10px;
+}
+
+.result {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	justify-content: space-between;
+	align-items: flex-start;
+}
+
+.result h3 {
+	margin: 0;
+	font-size: 1.05rem;
+}
+
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.chips li {
+	padding: 2px 8px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	font-size: 0.85rem;
+	color: var(--muted);
+}
+
+.empty {
+	padding: 24px;
+	text-align: center;
+	background: var(--surface);
+	border: 1px dashed var(--border);
+	border-radius: var(--radius);
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}

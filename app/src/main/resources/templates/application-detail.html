@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${job.title})}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main>
+	<div th:replace="~{fragments :: flash}"></div>
+	<p><a th:href="@{/}">← All applications</a></p>
+
+	<div class="page-title">
+		<div>
+			<h1 th:text="${job.title}">Junior Java Developer</h1>
+			<p class="subtitle">
+				<span th:text="${job.company}">Example Logistics</span>
+				<span th:if="${job.location}"> · <span th:text="${job.location}">Riga</span></span>
+			</p>
+		</div>
+		<div class="actions">
+			<span th:replace="~{fragments :: stage(${jobApplication.stage})}"></span>
+			<a class="button" th:href="@{/applications/{id}/edit(id=${jobApplication.id})}">Edit</a>
+		</div>
+	</div>
+
+	<div class="columns">
+		<section class="main-column">
+			<div class="card" aria-labelledby="progress-heading">
+				<h2 id="progress-heading">Progress</h2>
+				<p th:if="${jobApplication.stage.isFinal()}" class="muted">
+					This application is <strong th:text="${jobApplication.stage.label}">Accepted</strong>. That is a final
+					stage, so it cannot move any further.
+				</p>
+				<form th:unless="${jobApplication.stage.isFinal()}" th:action="@{/applications/{id}/stage(id=${jobApplication.id})}"
+					method="post" class="inline-form">
+					<label>Move to
+						<select name="stage" required>
+							<option th:each="s : ${jobApplication.stage.nextStages()}" th:value="${s}" th:text="${s.label}">Applied</option>
+						</select>
+					</label>
+					<label>On
+						<input type="date" name="date" th:value="${today}" th:max="${today}" required>
+					</label>
+					<button type="submit" class="primary">Update stage</button>
+				</form>
+			</div>
+
+			<div class="card" aria-labelledby="note-heading">
+				<h2 id="note-heading">Add a note</h2>
+				<form th:action="@{/applications/{id}/notes(id=${jobApplication.id})}" method="post" class="stack">
+					<label class="visually-hidden" for="note-text">Note</label>
+					<textarea id="note-text" name="text" rows="3" maxlength="5000" required
+						placeholder="Interview questions, contacts, what to follow up on…"></textarea>
+					<div class="inline-form">
+						<label>Date <input type="date" name="date" th:value="${today}"></label>
+						<button type="submit">Add note</button>
+					</div>
+				</form>
+			</div>
+
+			<div class="card" aria-labelledby="history-heading">
+				<h2 id="history-heading">History</h2>
+				<ol class="timeline">
+					<li th:each="e : ${history}" th:classappend="'event-' + ${#strings.toLowerCase(e.type.name())}">
+						<time th:datetime="${e.occurredOn}" th:text="${#temporals.format(e.occurredOn, 'd MMM yyyy')}">1 Nov 2026</time>
+						<div th:switch="${e.type.name()}">
+							<p th:case="'CREATED'">Saved to the tracker</p>
+							<p th:case="'STAGE_CHANGE'">
+								<span th:text="${e.fromStage.label}">Saved</span> → <strong th:text="${e.toStage.label}">Applied</strong>
+							</p>
+							<p th:case="'NOTE'" class="note" th:text="${e.note}">Note text</p>
+						</div>
+					</li>
+				</ol>
+			</div>
+		</section>
+
+		<aside class="side-column">
+			<div class="card">
+				<h2>Details</h2>
+				<dl>
+					<dt>Source</dt>
+					<dd th:text="${job.sourceProvider.name() == 'HIRINGCAFE'} ? 'HiringCafe' : 'Added by hand'">Added by hand</dd>
+					<dt>Listing</dt>
+					<dd>
+						<a th:if="${job.sourceUrl}" th:href="${job.sourceUrl}" rel="noopener noreferrer" target="_blank">Open listing</a>
+						<span th:unless="${job.sourceUrl}" class="muted">No link</span>
+					</dd>
+					<dt>Applied on</dt>
+					<dd th:text="${jobApplication.appliedOn} ? ${#temporals.format(jobApplication.appliedOn, 'd MMM yyyy')} : 'Not yet'">Not yet</dd>
+				</dl>
+			</div>
+			<form th:if="${!jobApplication.archived}" th:action="@{/applications/{id}/archive(id=${jobApplication.id})}" method="post">
+				<button type="submit" class="subtle">Archive</button>
+			</form>
+			<form th:if="${jobApplication.archived}" th:action="@{/applications/{id}/restore(id=${jobApplication.id})}" method="post">
+				<p class="muted">This application is archived.</p>
+				<button type="submit">Restore</button>
+			</form>
+		</aside>
+	</div>
+</main>
+</body>
+</html>

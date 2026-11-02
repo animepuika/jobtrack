@@ -3,8 +3,14 @@
 A personal job application and interview tracker, built to learn Java, Spring Boot,
 PostgreSQL, Docker, microservices, and Microsoft Azure.
 
-**Status:** project blueprint. There is no runnable application or tested live
-HiringCafe integration yet.
+**Status:** milestones 1–5 are built in [app/](app/README.md): manual tracking,
+stage rules and history, a JSON API, a signed-in dashboard, PostgreSQL storage,
+and HiringCafe search and import. 81 automated tests pass against a real
+PostgreSQL. Milestones 6–10 (CVs, reminders, Docker image, CI, Azure,
+microservice, portfolio release) are not started. The planned UI redesign brief is
+in [docs/design-prompt.md](docs/design-prompt.md).
+
+The [lessons/](lessons/) folder holds the first two plain-Java lessons.
 
 ## Purpose
 

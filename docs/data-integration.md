@@ -81,8 +81,11 @@ that account. Those features must not be presented as synchronized with JobTrack
 The provider documentation establishes the connection mechanism. A first live
 check on November 1, 2026 confirmed both tools without authentication and
 recorded their actual response shapes; see
-[Milestone 0 notes](milestone-0-notes.md#hiringcafe-mcp-feasibility-check). The full
-adapter is still unbuilt, and availability and limits can change.
+[Milestone 0 notes](milestone-0-notes.md#hiringcafe-mcp-feasibility-check). The
+adapter is now implemented in `app/` and tested against fictional responses; see
+[the app README](../app/README.md#hiringcafe-integration). A live search from the app
+has not succeeded yet, because a network DNS filter blocked the domain on
+November 2. Availability and limits can change.
 
 ## Reliability rules to implement
 

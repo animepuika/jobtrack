@@ -116,6 +116,17 @@ Cloudflare verification page in the built-in browser. It was not rechecked;
 the live calls above are the current evidence. Review the page, and the terms,
 in an ordinary browser before Milestone 5.
 
+### Network block observed on November 2, 2026
+
+On November 2 the local DNS resolver returned `80.232.230.35` for
+`hiringcafe.com`, a sinkhole server presenting a certificate from
+"Whalebone Sinkhole CA" (a DNS security filter used by some networks and internet
+providers). A public resolver returned Cloudflare's addresses as before. Java
+rejected the certificate (`PKIX path building failed`) and `curl` also failed, so
+live HiringCafe search does not work on this network until the filter allows the
+domain. The app reports this as "HiringCafe could not be reached" and keeps manual
+entry working. This is a network setting, not an application fault.
+
 ## Remaining to finish Milestone 0
 
 1. Fix Docker Desktop startup, then start PostgreSQL in a throwaway container and

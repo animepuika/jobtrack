@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${editing} ? 'Edit job' : 'Add job')}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main class="narrow">
+	<h1 th:text="${editing} ? 'Edit job' : 'Add a job'">Add a job</h1>
+	<p th:unless="${editing}" class="muted">Type in a job you found anywhere. It starts in the Saved stage, which means
+		"interested", not "applied".</p>
+
+	<p th:if="${duplicateId}" class="flash error" role="alert">
+		You already track this job.
+		<a th:href="@{/applications/{id}(id=${duplicateId})}">Open it</a>
+	</p>
+
+	<form th:object="${jobForm}" method="post" class="card stack" novalidate
+		th:action="${editing} ? @{/applications/{id}/edit(id=${applicationId})} : @{/applications}">
+		<p th:if="${#fields.hasGlobalErrors()}" class="flash error" role="alert" th:text="${#fields.globalErrors()[0]}">Error</p>
+
+		<label>Job title
+			<input type="text" th:field="*{title}" maxlength="200" required th:errorclass="invalid">
+			<span class="field-error" th:if="${#fields.hasErrors('title')}" th:errors="*{title}">Enter a job title</span>
+		</label>
+		<label>Company
+			<input type="text" th:field="*{company}" maxlength="200" required th:errorclass="invalid">
+			<span class="field-error" th:if="${#fields.hasErrors('company')}" th:errors="*{company}">Enter a company</span>
+		</label>
+		<label>Location <span class="muted">(optional)</span>
+			<input type="text" th:field="*{location}" maxlength="200" placeholder="Riga, Remote, …">
+			<span class="field-error" th:if="${#fields.hasErrors('location')}" th:errors="*{location}">Too long</span>
+		</label>
+		<label>Link to the listing <span class="muted">(optional)</span>
+			<input type="url" th:field="*{sourceUrl}" maxlength="2000" placeholder="https://…"
+				th:readonly="${editing}" th:errorclass="invalid">
+			<span class="field-error" th:if="${#fields.hasErrors('sourceUrl')}" th:errors="*{sourceUrl}">Too long</span>
+			<span th:if="${editing}" class="muted">The link identifies the job, so it cannot be changed.</span>
+		</label>
+
+		<div class="actions">
+			<button type="submit" class="primary" th:text="${editing} ? 'Save changes' : 'Save job'">Save job</button>
+			<a th:href="${editing} ? @{/applications/{id}(id=${applicationId})} : @{/}">Cancel</a>
+		</div>
+	</form>
+</main>
+</body>
+</html>

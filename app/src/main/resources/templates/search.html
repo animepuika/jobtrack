@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Search jobs')}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main>
+	<div th:replace="~{fragments :: flash}"></div>
+	<h1>Search HiringCafe</h1>
+
+	<div th:unless="${searchEnabled}" class="card">
+		<p>Live job search is turned off here. You can still <a th:href="@{/applications/new}">add jobs by hand</a>.</p>
+	</div>
+
+	<form th:if="${searchEnabled}" th:action="@{/search}" method="get" class="card filters">
+		<label>Keywords
+			<input type="search" name="keywords" th:value="${keywords}" placeholder="Java developer" required>
+		</label>
+		<label>Location
+			<input type="text" name="location" th:value="${location}" placeholder="Latvia">
+		</label>
+		<label>Workplace
+			<select name="workplace">
+				<option value="">Any</option>
+				<option th:each="w : ${workplaces}" th:value="${w}" th:text="${w.label()}" th:selected="${w == workplace}">Remote</option>
+			</select>
+		</label>
+		<label>Seniority
+			<select name="seniority">
+				<option value="">Any</option>
+				<option th:each="s : ${seniorities}" th:value="${s}" th:text="${s.label()}" th:selected="${s == seniority}">Entry Level</option>
+			</select>
+		</label>
+		<button type="submit" class="primary">Search</button>
+	</form>
+
+	<div th:if="${searchError}" class="flash error" role="alert">
+		<p th:text="${searchError}">HiringCafe did not respond in time</p>
+		<p th:if="${retryAfterSeconds}">HiringCafe asked to wait <span th:text="${retryAfterSeconds}">30</span> seconds.</p>
+		<p>Your tracker still works. You can <a th:href="@{/applications/new}">add the job by hand</a>.</p>
+	</div>
+
+	<section th:if="${page}" aria-labelledby="results-heading">
+		<h2 id="results-heading">
+			Showing <span th:text="${page.results().size()}">3</span> of <span th:text="${page.total()}">33</span> matches
+		</h2>
+		<p class="muted">Results come straight from HiringCafe and are not saved until you track one. HiringCafe's
+			location filter is broad, so check each place.</p>
+		<p th:if="${page.results().isEmpty()}" class="empty">No jobs found. Try fewer or different words.</p>
+
+		<ul class="results">
+			<li th:each="r : ${page.results()}" class="card result">
+				<div>
+					<h3><a th:href="${r.url()}" th:text="${r.title()}" rel="noopener noreferrer" target="_blank">Junior Java Developer</a></h3>
+					<p class="subtitle" th:text="${r.company()}">Example Logistics</p>
+					<ul class="chips">
+						<li th:each="h : ${r.highlights()}" th:text="${h}">Riga · Hybrid</li>
+					</ul>
+				</div>
+				<div class="result-action">
+					<a th:if="${tracked[r.externalId()]}" class="button"
+						th:href="@{/applications/{id}(id=${tracked[r.externalId()]})}">Tracked · open</a>
+					<form th:unless="${tracked[r.externalId()]}" th:action="@{/search/track}" method="post">
+						<input type="hidden" name="externalId" th:value="${r.externalId()}">
+						<input type="hidden" name="title" th:value="${r.title()}">
+						<input type="hidden" name="company" th:value="${r.company()}">
+						<input type="hidden" name="location" th:value="${r.location()}">
+						<input type="hidden" name="url" th:value="${r.url()}">
+						<button type="submit" class="primary">Track</button>
+					</form>
+				</div>
+			</li>
+		</ul>
+	</section>
+</main>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Dashboard')}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main>
+	<div th:replace="~{fragments :: flash}"></div>
+	<div class="page-title">
+		<h1>Your applications</h1>
+		<div class="actions">
+			<a class="button primary" th:href="@{/applications/new}">Add job</a>
+			<a class="button" th:if="${searchEnabled}" th:href="@{/search}">Search HiringCafe</a>
+		</div>
+	</div>
+
+	<section aria-label="Applications by stage" class="stage-counts">
+		<a th:each="s : ${stages}" class="count" th:href="@{/(stage=${s})}"
+			th:classappend="${s == selectedStage} ? 'selected'">
+			<span class="number" th:text="${counts.get(s)}">0</span>
+			<span th:replace="~{fragments :: stage(${s})}"></span>
+		</a>
+	</section>
+
+	<div class="columns">
+		<section class="main-column" aria-labelledby="list-heading">
+			<h2 id="list-heading" class="visually-hidden">Application list</h2>
+			<form th:action="@{/}" method="get" class="filters">
+				<label>Search
+					<input type="search" name="q" th:value="${q}" placeholder="Title, company or place">
+				</label>
+				<label>Stage
+					<select name="stage">
+						<option value="">Any stage</option>
+						<option th:each="s : ${stages}" th:value="${s}" th:text="${s.label}"
+							th:selected="${s == selectedStage}">Saved</option>
+					</select>
+				</label>
+				<label class="checkbox">
+					<input type="checkbox" name="archived" value="true" th:checked="${archived}"> Show archived
+				</label>
+				<button type="submit">Filter</button>
+				<a th:if="${selectedStage != null or q != null or archived}" th:href="@{/}">Clear</a>
+			</form>
+
+			<p th:if="${applications.isEmpty()}" class="empty">
+				No applications match. <a th:href="@{/applications/new}">Add a job</a> to start tracking.
+			</p>
+
+			<table th:unless="${applications.isEmpty()}" class="applications">
+				<thead>
+				<tr>
+					<th scope="col">Job</th>
+					<th scope="col">Location</th>
+					<th scope="col">Stage</th>
+					<th scope="col">Updated</th>
+				</tr>
+				</thead>
+				<tbody>
+				<tr th:each="a : ${applications}" th:classappend="${a.archived} ? 'archived'">
+					<td>
+						<a th:href="@{/applications/{id}(id=${a.id})}" th:text="${a.job.title}">Junior Java Developer</a>
+						<div class="muted" th:text="${a.job.company}">Example Logistics</div>
+					</td>
+					<td th:text="${a.job.location} ?: '—'">Riga</td>
+					<td>
+						<span th:replace="~{fragments :: stage(${a.stage})}"></span>
+						<span th:if="${a.archived}" class="muted">archived</span>
+					</td>
+					<td class="muted" th:text="${#temporals.format(a.updatedAt.atZone(zone), 'd MMM yyyy')}">1 Nov 2026</td>
+				</tr>
+				</tbody>
+			</table>
+		</section>
+
+		<aside class="side-column" aria-labelledby="activity-heading">
+			<h2 id="activity-heading">Recent activity</h2>
+			<p th:if="${recent.isEmpty()}" class="muted">Nothing yet.</p>
+			<ol class="activity">
+				<li th:each="e : ${recent}">
+					<span class="muted" th:text="${#temporals.format(e.occurredOn, 'd MMM')}">1 Nov</span>
+					<a th:href="@{/applications/{id}(id=${e.application.id})}" th:text="${e.application.job.title}">Job</a>
+					<span th:switch="${e.type.name()}">
+						<span th:case="'CREATED'">saved</span>
+						<span th:case="'STAGE_CHANGE'">→ <span th:text="${e.toStage.label}">Applied</span></span>
+						<span th:case="'NOTE'">note added</span>
+					</span>
+				</li>
+			</ol>
+		</aside>
+	</div>
+</main>
+</body>
+</html>

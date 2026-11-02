@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:fragment="head(title)">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title th:text="${title} + ' · JobTrack'">JobTrack</title>
+	<link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<header th:fragment="header" class="site-header">
+	<a class="brand" th:href="@{/}">JobTrack</a>
+	<nav sec:authorize="isAuthenticated()" aria-label="Main">
+		<a th:href="@{/}">Dashboard</a>
+		<a th:href="@{/applications/new}">Add job</a>
+		<a th:href="@{/search}">Search jobs</a>
+		<form th:action="@{/logout}" method="post" class="inline">
+			<button type="submit" class="link">Sign out (<span sec:authentication="name">user</span>)</button>
+		</form>
+	</nav>
+</header>
+
+<div th:fragment="flash">
+	<p class="flash success" role="status" th:if="${success}" th:text="${success}">Saved.</p>
+	<p class="flash error" role="alert" th:if="${error}" th:text="${error}">Something went wrong.</p>
+</div>
+
+<span th:fragment="stage(stage)" class="stage" th:classappend="'stage-' + ${#strings.toLowerCase(stage.name())}"
+	th:text="${stage.label}">Saved</span>
+
+</body>
+</html>
