@@ -35,8 +35,8 @@ relationships, integration limits, and public demo behavior.
 See [the project and learning plan](docs/project-plan.md) for scope, estimates,
 completion criteria, architecture, Azure labs, and the first lesson.
 
-See [the Claude handover](CLAUDE.md) for conversation context, the learner's
-background, the teaching approach, current project state, and where to resume.
+See [the app README](app/README.md) to run, test, and understand the built
+application.
 
 ## Learning sequence
 
