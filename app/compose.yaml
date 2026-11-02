@@ -1,7 +1,18 @@
-# Local PostgreSQL for JobTrack:          docker compose up -d
-# PostgreSQL and the app in containers:  docker compose --profile app up --build
-# The database password is for these local containers only.
+# JobTrack's local environment.
+#
+#   docker compose up -d --build              databases, Azurite and the reminder service;
+#                                             then run the tracker with ./mvnw spring-boot:run
+#   docker compose --profile app up --build   the same plus the tracker in a container
+#
+# Passwords and the internal token below are for these local containers only. The
+# Azurite account key is Azurite's published development key, not a secret.
+# Host ports can be changed with the *_PORT variables if something else uses them.
+
+x-azurite-connection: &azurite-connection
+  "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://azurite:10001/devstoreaccount1;"
+
 services:
+  # The tracker's database.
   postgres:
     image: postgres:18-alpine
     environment:
@@ -9,7 +20,7 @@ services:
       POSTGRES_USER: jobtrack
       POSTGRES_PASSWORD: jobtrack
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${JOBTRACK_DB_PORT:-5432}:5432"
     volumes:
       - jobtrack-data:/var/lib/postgresql
     healthcheck:
@@ -18,22 +29,71 @@ services:
       timeout: 3s
       retries: 10
 
+  # The reminder service's own database: a separate server, so neither service can
+  # read the other's tables.
+  reminders-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: reminders
+      POSTGRES_USER: reminders
+      POSTGRES_PASSWORD: reminders
+    ports:
+      - "127.0.0.1:${REMINDERS_DB_PORT:-5433}:5432"
+    volumes:
+      - reminders-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reminders -d reminders"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Local stand-in for Azure Storage Queue.
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    command: ["azurite-queue", "--queueHost", "0.0.0.0", "--location", "/data"]
+    ports:
+      - "127.0.0.1:${AZURITE_QUEUE_PORT:-10001}:10001"
+    volumes:
+      - azurite-data:/data
+
+  reminder-service:
+    build: ../reminder-service
+    depends_on:
+      reminders-db:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+    environment:
+      REMINDERS_DB_URL: jdbc:postgresql://reminders-db:5432/reminders
+      REMINDERS_QUEUE_CONNECTION_STRING: *azurite-connection
+      REMINDERS_INTERNAL_TOKEN: ${REMINDERS_INTERNAL_TOKEN:-local-development-token}
+    ports:
+      - "127.0.0.1:${REMINDERS_PORT:-8081}:8081"
+
   app:
     profiles: ["app"]
     build: .
     depends_on:
       postgres:
         condition: service_healthy
+      azurite:
+        condition: service_started
     environment:
       JOBTRACK_DB_URL: jdbc:postgresql://postgres:5432/jobtrack
+      JOBTRACK_QUEUE_CONNECTION_STRING: *azurite-connection
+      JOBTRACK_REMINDERS_URL: http://reminder-service:8081
+      REMINDERS_INTERNAL_TOKEN: ${REMINDERS_INTERNAL_TOKEN:-local-development-token}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
       JOBTRACK_USERNAME: ${JOBTRACK_USERNAME:-}
       JOBTRACK_PASSWORD: ${JOBTRACK_PASSWORD:-}
+      JOBTRACK_HIRINGCAFE_ENABLED: ${JOBTRACK_HIRINGCAFE_ENABLED:-true}
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${JOBTRACK_PORT:-8080}:8080"
     volumes:
       - jobtrack-documents:/app/data
 
 volumes:
   jobtrack-data:
   jobtrack-documents:
+  reminders-data:
+  azurite-data:

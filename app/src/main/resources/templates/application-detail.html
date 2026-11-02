@@ -144,32 +144,41 @@
 
 			<section class="card" aria-labelledby="reminders-heading">
 				<h2 id="reminders-heading">Reminders</h2>
-				<p th:if="${openReminders.isEmpty()}" class="hint">No open reminders. Add one to remember a follow-up.</p>
+				<p th:if="${remindersUnavailable}" class="flash warn" role="status">
+					<svg th:replace="~{fragments :: icon-clock}"></svg>
+					<span>Reminders can't be loaded right now. Everything else works; try again in a moment.</span>
+				</p>
+				<p th:if="${pendingReminderChanges > 0}" class="hint pending-changes" role="status">
+					<span th:text="${pendingReminderChanges}">1</span>
+					<span th:text="${pendingReminderChanges == 1} ? 'reminder change is on its way.' : 'reminder changes are on their way.'">reminder change is on its way.</span>
+					Reload in a moment to see it.
+				</p>
+				<p th:if="${openReminders.isEmpty() and !remindersUnavailable}" class="hint">No open reminders. Add one to remember a follow-up.</p>
 				<ul th:unless="${openReminders.isEmpty()}" class="reminder-list">
 					<li th:each="r : ${openReminders}" class="reminder" th:classappend="${r.isOverdue(now)} ? 'overdue'">
 						<p class="reminder-when">
-							<time th:datetime="${r.dueAt}" th:text="${#temporals.format(r.dueAt.atZone(zone), 'EEE d MMM yyyy, HH:mm')}">Mon 9 Nov 2026, 09:00</time>
+							<time th:datetime="${r.dueAt()}" th:text="${#temporals.format(r.dueAt().atZone(zone), 'EEE d MMM yyyy, HH:mm')}">Mon 9 Nov 2026, 09:00</time>
 							<span th:if="${r.isOverdue(now)}" class="overdue-tag">Overdue</span>
 						</p>
-						<p class="note" th:text="${r.note}">Email Sara if I hear nothing</p>
+						<p class="note" th:text="${r.note()}">Email Sara if I hear nothing</p>
 						<div class="actions">
-							<form th:action="@{/reminders/{id}/complete(id=${r.id})}" method="post">
+							<form th:action="@{/reminders/{id}/complete(id=${r.id()})}" method="post">
 								<input type="hidden" name="returnTo" th:value="'/applications/' + ${jobApplication.id}">
 								<button type="submit"><svg th:replace="~{fragments :: icon-check}"></svg>Done</button>
 							</form>
 							<details class="reschedule">
 								<summary>Move</summary>
-								<form th:action="@{/reminders/{id}/reschedule(id=${r.id})}" method="post" class="inline-form">
+								<form th:action="@{/reminders/{id}/reschedule(id=${r.id()})}" method="post" class="inline-form">
 									<input type="hidden" name="returnTo" th:value="'/applications/' + ${jobApplication.id}">
 									<div class="field">
-										<label th:for="'move-date-' + ${r.id}">Date</label>
-										<input th:id="'move-date-' + ${r.id}" type="date" name="date" th:min="${today}"
-											th:value="${#temporals.format(r.dueAt.atZone(zone), 'yyyy-MM-dd')}" required>
+										<label th:for="'move-date-' + ${r.id()}">Date</label>
+										<input th:id="'move-date-' + ${r.id()}" type="date" name="date" th:min="${today}"
+											th:value="${#temporals.format(r.dueAt().atZone(zone), 'yyyy-MM-dd')}" required>
 									</div>
 									<div class="field">
-										<label th:for="'move-time-' + ${r.id}">Time</label>
-										<input th:id="'move-time-' + ${r.id}" type="time" name="time"
-											th:value="${#temporals.format(r.dueAt.atZone(zone), 'HH:mm')}">
+										<label th:for="'move-time-' + ${r.id()}">Time</label>
+										<input th:id="'move-time-' + ${r.id()}" type="time" name="time"
+											th:value="${#temporals.format(r.dueAt().atZone(zone), 'HH:mm')}">
 									</div>
 									<button type="submit">Save</button>
 								</form>
@@ -199,8 +208,8 @@
 					<summary>Done (<span th:text="${doneReminders.size()}">1</span>)</summary>
 					<ul class="reminder-list">
 						<li th:each="r : ${doneReminders}" class="reminder done">
-							<p class="reminder-when"><time th:datetime="${r.dueAt}" th:text="${#temporals.format(r.dueAt.atZone(zone), 'd MMM yyyy')}">2 Nov 2026</time></p>
-							<p class="note" th:text="${r.note}">Sent the thank-you email</p>
+							<p class="reminder-when"><time th:datetime="${r.dueAt()}" th:text="${#temporals.format(r.dueAt().atZone(zone), 'd MMM yyyy')}">2 Nov 2026</time></p>
+							<p class="note" th:text="${r.note()}">Sent the thank-you email</p>
 						</li>
 					</ul>
 				</details>

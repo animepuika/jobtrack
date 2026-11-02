@@ -160,17 +160,26 @@
 			<aside class="side-column">
 				<section class="card" aria-labelledby="upcoming-heading">
 					<h2 id="upcoming-heading">Coming up</h2>
-					<p th:if="${upcoming.isEmpty()}" class="hint">No reminders. Add one from an application page.</p>
+					<p th:if="${remindersUnavailable}" class="flash warn" role="status">
+						<svg th:replace="~{fragments :: icon-clock}"></svg>
+						<span>Reminders can't be loaded right now. Everything else works; try again in a moment.</span>
+					</p>
+					<p th:if="${pendingReminderChanges > 0}" class="hint pending-changes" role="status">
+						<span th:text="${pendingReminderChanges}">1</span>
+						<span th:text="${pendingReminderChanges == 1} ? 'reminder change is on its way.' : 'reminder changes are on their way.'">reminder change is on its way.</span>
+						Reload in a moment to see it.
+					</p>
+					<p th:if="${upcoming.isEmpty() and !remindersUnavailable}" class="hint">No reminders. Add one from an application page.</p>
 					<ul th:unless="${upcoming.isEmpty()}" class="reminder-list">
 						<li th:each="r : ${upcoming}" class="reminder" th:classappend="${r.isOverdue(now)} ? 'overdue'"
-							th:with="app=${reminderApplications.get(r.applicationId)}">
+							th:with="app=${reminderApplications.get(r.applicationId())}">
 							<p class="reminder-when">
-								<time th:datetime="${r.dueAt}" th:text="${#temporals.format(r.dueAt.atZone(zone), 'EEE d MMM, HH:mm')}">Mon 9 Nov, 09:00</time>
+								<time th:datetime="${r.dueAt()}" th:text="${#temporals.format(r.dueAt().atZone(zone), 'EEE d MMM, HH:mm')}">Mon 9 Nov, 09:00</time>
 								<span th:if="${r.isOverdue(now)}" class="overdue-tag">Overdue</span>
 							</p>
-							<a th:if="${app}" th:href="@{/applications/{id}(id=${r.applicationId})}" th:text="${app.job.title}">Junior Java Developer</a>
-							<p class="note" th:text="${r.note}">Email Sara</p>
-							<form th:action="@{/reminders/{id}/complete(id=${r.id})}" method="post">
+							<a th:if="${app}" th:href="@{/applications/{id}(id=${r.applicationId()})}" th:text="${app.job.title}">Junior Java Developer</a>
+							<p class="note" th:text="${r.note()}">Email Sara</p>
+							<form th:action="@{/reminders/{id}/complete(id=${r.id()})}" method="post">
 								<input type="hidden" name="returnTo" value="/">
 								<button type="submit"><svg th:replace="~{fragments :: icon-check}"></svg>Done</button>
 							</form>

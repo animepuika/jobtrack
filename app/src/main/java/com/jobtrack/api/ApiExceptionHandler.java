@@ -6,6 +6,7 @@ import java.util.Map;
 import com.jobtrack.documents.CvNotFoundException;
 import com.jobtrack.jobsource.JobSourceException;
 import com.jobtrack.reminders.ReminderNotFoundException;
+import com.jobtrack.reminders.RemindersUnavailableException;
 import com.jobtrack.tracking.ApplicationNotFoundException;
 import com.jobtrack.tracking.DuplicateJobException;
 import com.jobtrack.tracking.StageChangeNotAllowedException;
@@ -45,6 +46,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler
 	ProblemDetail handle(ReminderNotFoundException ex) {
 		return problem(HttpStatus.NOT_FOUND, "Not found", ex.getMessage());
+	}
+
+	@ExceptionHandler
+	ProblemDetail handle(RemindersUnavailableException ex) {
+		return problem(HttpStatus.SERVICE_UNAVAILABLE, "Reminders unavailable", ex.getMessage());
 	}
 
 	@ExceptionHandler

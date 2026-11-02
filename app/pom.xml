@@ -28,8 +28,14 @@
 	</scm>
 	<properties>
 		<java.version>25</java.version>
+		<azure-storage-queue.version>12.25.0</azure-storage-queue.version>
 	</properties>
 	<dependencies>
+		<dependency>
+			<groupId>com.azure</groupId>
+			<artifactId>azure-storage-queue</artifactId>
+			<version>${azure-storage-queue.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>

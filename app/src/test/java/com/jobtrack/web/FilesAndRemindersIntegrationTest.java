@@ -2,16 +2,20 @@ package com.jobtrack.web;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import com.jobtrack.IntegrationTest;
 import com.jobtrack.TestUsers;
 import com.jobtrack.documents.CvService;
 import com.jobtrack.documents.CvVersion;
-import com.jobtrack.reminders.ReminderService;
+import com.jobtrack.InMemoryReminderService;
+import com.jobtrack.events.OutboxPublisher;
+import com.jobtrack.reminders.ReminderCommands;
 import com.jobtrack.tracking.JobApplication;
 import com.jobtrack.tracking.NewJob;
 import com.jobtrack.tracking.TrackingService;
 import com.jobtrack.user.JobTrackUser;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -53,7 +57,13 @@ class FilesAndRemindersIntegrationTest {
 	private CvService cvs;
 
 	@Autowired
-	private ReminderService reminders;
+	private ReminderCommands reminders;
+
+	@Autowired
+	private OutboxPublisher publisher;
+
+	@Autowired
+	private InMemoryReminderService reminderService;
 
 	private JobTrackUser user;
 
@@ -64,6 +74,11 @@ class FilesAndRemindersIntegrationTest {
 		this.user = this.users.create();
 		this.application = this.tracking.saveJob(this.user.getId(),
 				NewJob.manual("Junior Java Developer", "Example Logistics", "Riga", null));
+	}
+
+	@AfterEach
+	void resetStandIn() {
+		this.reminderService.reset();
 	}
 
 	@Test
@@ -133,6 +148,10 @@ class FilesAndRemindersIntegrationTest {
 				.with(user(this.user))
 				.with(csrf()))
 			.andExpect(redirectedUrl("/applications/" + this.application.getId()));
+		this.mvc.perform(get("/applications/{id}", this.application.getId()).with(user(this.user)))
+			.andExpect(content().string(containsString("reminder change is on its way")));
+
+		this.publisher.publishDue();
 
 		this.mvc.perform(get("/applications/{id}", this.application.getId()).with(user(this.user)))
 			.andExpect(content().string(containsString("Email the recruiter")))
@@ -144,8 +163,8 @@ class FilesAndRemindersIntegrationTest {
 
 	@Test
 	void completingAReminderOnlyRedirectsToLocalPages() throws Exception {
-		long id = this.reminders.add(this.user.getId(), this.application.getId(), this.tracking.today().plusDays(1),
-				null, "Call back").getId();
+		UUID id = this.reminders.add(this.user.getId(), this.application.getId(), this.tracking.today().plusDays(1),
+				null, "Call back");
 
 		this.mvc
 			.perform(post("/reminders/{id}/complete", id).param("returnTo", "https://evil.example/phish")
@@ -167,6 +186,7 @@ class FilesAndRemindersIntegrationTest {
 		upload();
 		this.reminders.add(this.user.getId(), this.application.getId(), this.tracking.today().plusDays(1), null,
 				"Call back");
+		this.publisher.publishDue();
 		JobTrackUser other = this.users.create();
 		this.tracking.saveJob(other.getId(), NewJob.manual("Someone else's job", "Contoso Retail", null, null));
 
@@ -174,11 +194,27 @@ class FilesAndRemindersIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(header().string("Content-Disposition", containsString("jobtrack-export-")))
 			.andExpect(jsonPath("$.format").value("jobtrack-export-v1"))
+			.andExpect(jsonPath("$.remindersIncluded").value(true))
 			.andExpect(jsonPath("$.applications.length()").value(1))
 			.andExpect(jsonPath("$.applications[0].title").value("Junior Java Developer"))
 			.andExpect(jsonPath("$.applications[0].history[0].type").value("CREATED"))
 			.andExpect(jsonPath("$.applications[0].reminders[0].note").value("Call back"))
 			.andExpect(jsonPath("$.cvVersions[0].label").value("Backend CV"));
+	}
+
+	@Test
+	void pagesStillWorkWhenTheReminderServiceIsDown() throws Exception {
+		this.reminderService.setUnavailable(true);
+
+		this.mvc.perform(get("/applications/{id}", this.application.getId()).with(user(this.user)))
+			.andExpect(status().isOk())
+			.andExpect(content().string(containsString("Reminders can't be loaded right now")))
+			.andExpect(content().string(containsString("Junior Java Developer")));
+		this.mvc.perform(get("/").with(user(this.user)))
+			.andExpect(status().isOk())
+			.andExpect(content().string(containsString("Reminders can't be loaded right now")));
+		this.mvc.perform(get("/api/export").with(httpBasic(this.user.getUsername(), TestUsers.PASSWORD)))
+			.andExpect(jsonPath("$.remindersIncluded").value(false));
 	}
 
 	private CvVersion upload() {

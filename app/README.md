@@ -25,17 +25,19 @@ You need JDK 25 and Docker. Commands run from this `app` folder; on Windows use
 Open <http://localhost:8080> and sign in as `demo` / `demo-password`. Live
 HiringCafe search is off in the demo.
 
-**Personal use** with a database that keeps your data:
+**Personal use** with databases that keep your data. `docker compose up` starts both
+PostgreSQL databases, Azurite (the local queue) and the
+[reminder service](../reminder-service/README.md); the tracker runs from this folder:
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 JOBTRACK_USERNAME=you JOBTRACK_PASSWORD='a long password' ./mvnw spring-boot:run
 ```
 
 The account is created on the first start. Your records live in the
 `jobtrack-data` Docker volume and uploaded CVs in `app/data/`, both outside Git.
 
-**Everything in containers** (PostgreSQL plus the app image built from the
+**Everything in containers** (the same plus the tracker image built from the
 [Dockerfile](Dockerfile)):
 
 ```bash
@@ -49,6 +51,9 @@ Uploaded CVs then live in the `jobtrack-documents` volume.
 | Environment variable | Default | Meaning |
 | --- | --- | --- |
 | `JOBTRACK_DB_URL` | `jdbc:postgresql://localhost:5432/jobtrack` | Database |
+| `JOBTRACK_QUEUE_CONNECTION_STRING` | local Azurite | Queue for reminder events |
+| `JOBTRACK_REMINDERS_URL` | `http://localhost:8081` | Reminder service |
+| `REMINDERS_INTERNAL_TOKEN` | `local-development-token` | Shared with the reminder service; set a long random value outside your PC |
 | `JOBTRACK_DB_USERNAME` / `JOBTRACK_DB_PASSWORD` | `jobtrack` / `jobtrack` | Database login (local container only) |
 | `JOBTRACK_USERNAME` / `JOBTRACK_PASSWORD` | none | Account to create at startup; password needs 8+ characters |
 | `JOBTRACK_HIRINGCAFE_ENABLED` | `true` (`false` in the demo profile) | Live job search |
@@ -83,7 +88,8 @@ com.jobtrack
 ├── tracking    the core: jobs, applications, stage rules, history (no web code)
 ├── jobsource   HiringCafe adapter behind a JobSource interface, and job import
 ├── documents   CV versions: upload checks, private file storage, ownership
-├── reminders   follow-up reminders; refers to applications by ID only
+├── reminders   reminder commands and reads; the reminders themselves live in the reminder service
+├── events      transactional outbox and the publisher that sends events to the queue
 ├── export      collects one user's records into a JSON export
 ├── user        accounts, password hashing, sign-in lookup
 ├── api         JSON API under /api (HTTP Basic, no session)
@@ -107,11 +113,14 @@ Flyway creates the schema from
 | `job_application` | The user's progress on it: stage, applied date, archived flag |
 | `application_event` | History: created, each stage change, notes. Only added to, never edited |
 | `cv_version` | Uploaded CV details and a random storage key; the file itself is in document storage |
-| `reminder` | Follow-ups with a due time and a done time. Linked to applications by ID only, so this module can later become its own service |
+| `reminder_ref` | Which reminders exist, whose they are, their latest event version and whether they are open. The reminders themselves are in the reminder service's database |
+| `outbox_event` | Events waiting to be sent to the queue, or already sent |
 
 Migrations: [V1](src/main/resources/db/migration/V1__create_tracker_tables.sql) creates
 the tracker, [V2](src/main/resources/db/migration/V2__add_cv_versions_reminders_archive_date.sql)
-adds CVs, reminders, the archive date, and the CV used per application.
+adds CVs, reminders, the archive date, and the CV used per application, and
+[V3](src/main/resources/db/migration/V3__move_reminders_to_reminder_service.sql)
+hands existing reminders to the reminder service through the outbox.
 
 ### CV files
 
@@ -125,9 +134,15 @@ adds CVs, reminders, the archive date, and the CV used per application.
 
 ### Reminders
 
-Reminders show on the dashboard ("Coming up") and the application page, soonest
-first, with overdue ones marked. They are entered in the configured time zone and
-stored as instants. Nothing is sent by email or text message.
+Reminders live in a separate [reminder service](../reminder-service/README.md) with
+its own database. The tracker records each change and an event in one transaction
+(the transactional outbox), a publisher sends events to a queue, and the dashboard
+reads reminders back over an internal API. A change shows up a second or two later;
+until then the page says it is on its way. How duplicates, retries and
+out-of-order messages are handled is in [docs/events.md](../docs/events.md).
+
+Reminders are entered in the configured time zone and stored as instants. Nothing
+is sent by email or text message.
 
 Rules the database enforces as a last line of defense: no blank titles, one
 application per job, and no duplicate jobs per user (same HiringCafe ID, or the
@@ -164,8 +179,8 @@ All endpoints need HTTP Basic authentication. Errors are
 | `GET /api/cv-versions`, `POST /api/cv-versions` | List, or upload as multipart `label` + `file` |
 | `GET /api/cv-versions/{id}/file` | Download a CV |
 | `PUT /api/applications/{id}/cv-version` | Record the CV sent: `{"cvVersionId": 3}`, or `null` to clear |
-| `GET /api/applications/{id}/reminders`, `POST` same path | List, or add: `{"date": "2026-11-09", "time": "10:00", "note": "…"}` |
-| `PATCH /api/reminders/{id}`, `POST /api/reminders/{id}/complete` | Move or finish a reminder |
+| `GET /api/applications/{id}/reminders`, `POST` same path | List, or add: `{"date": "2026-11-09", "time": "10:00", "note": "…"}`. Adding answers 202 Accepted with the new ID; the reminder appears a moment later |
+| `PATCH /api/reminders/{id}`, `POST /api/reminders/{id}/complete` | Move or finish a reminder (202 Accepted) |
 | `GET /api/export` | Download all your records as JSON (the page version is `/export`) |
 
 Example:

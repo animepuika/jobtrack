@@ -1,13 +1,16 @@
 package com.jobtrack.web;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.jobtrack.jobsource.JobSource;
-import com.jobtrack.reminders.Reminder;
-import com.jobtrack.reminders.ReminderService;
+import com.jobtrack.reminders.ReminderCommands;
+import com.jobtrack.reminders.ReminderReader;
+import com.jobtrack.reminders.ReminderView;
+import com.jobtrack.reminders.RemindersUnavailableException;
 import com.jobtrack.tracking.ApplicationFilter;
 import com.jobtrack.tracking.JobApplication;
 import com.jobtrack.tracking.Stage;
@@ -29,20 +32,24 @@ class DashboardController {
 
 	private static final int RECENT_ACTIVITY = 8;
 
-	private final TrackingService tracking;
-
 	private static final int UPCOMING_REMINDERS = 6;
+
+	private final TrackingService tracking;
 
 	private final JobSource jobSource;
 
-	private final ReminderService reminders;
+	private final ReminderReader reminders;
+
+	private final ReminderCommands reminderCommands;
 
 	private final Clock clock;
 
-	DashboardController(TrackingService tracking, JobSource jobSource, ReminderService reminders, Clock clock) {
+	DashboardController(TrackingService tracking, JobSource jobSource, ReminderReader reminders,
+			ReminderCommands reminderCommands, Clock clock) {
 		this.tracking = tracking;
 		this.jobSource = jobSource;
 		this.reminders = reminders;
+		this.reminderCommands = reminderCommands;
 		this.clock = clock;
 	}
 
@@ -78,11 +85,20 @@ class DashboardController {
 		model.addAttribute("filtered", stage != null || text != null || archived);
 		model.addAttribute("links", new Links(stage, text, archived));
 		model.addAttribute("zone", this.clock.getZone());
-		List<Reminder> upcoming = this.reminders.upcoming(user.getId(), UPCOMING_REMINDERS);
+		model.addAttribute("remindersUnavailable", false);
+		List<ReminderView> upcoming;
+		try {
+			upcoming = this.reminders.upcoming(user.getId(), UPCOMING_REMINDERS);
+		}
+		catch (RemindersUnavailableException ex) {
+			upcoming = List.of();
+			model.addAttribute("remindersUnavailable", true);
+		}
 		model.addAttribute("upcoming", upcoming);
 		model.addAttribute("reminderApplications", this.tracking.findOwnedByIds(user.getId(),
-				upcoming.stream().map(Reminder::getApplicationId).collect(Collectors.toSet())));
-		model.addAttribute("now", this.reminders.now());
+				upcoming.stream().map(ReminderView::applicationId).collect(Collectors.toSet())));
+		model.addAttribute("pendingReminderChanges", this.reminderCommands.pendingChanges(user.getId()));
+		model.addAttribute("now", Instant.now(this.clock));
 		return "dashboard";
 	}
 

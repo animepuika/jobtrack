@@ -11,8 +11,9 @@ import com.jobtrack.export.PersonalExport.ApplicationRecord;
 import com.jobtrack.export.PersonalExport.CvRecord;
 import com.jobtrack.export.PersonalExport.HistoryRecord;
 import com.jobtrack.export.PersonalExport.ReminderRecord;
-import com.jobtrack.reminders.Reminder;
-import com.jobtrack.reminders.ReminderService;
+import com.jobtrack.reminders.ReminderReader;
+import com.jobtrack.reminders.ReminderView;
+import com.jobtrack.reminders.RemindersUnavailableException;
 import com.jobtrack.tracking.ApplicationDetails;
 import com.jobtrack.tracking.ApplicationFilter;
 import com.jobtrack.tracking.JobApplication;
@@ -30,13 +31,13 @@ public class ExportService {
 
 	private final TrackingService tracking;
 
-	private final ReminderService reminders;
+	private final ReminderReader reminders;
 
 	private final CvService cvVersions;
 
 	private final Clock clock;
 
-	public ExportService(TrackingService tracking, ReminderService reminders, CvService cvVersions, Clock clock) {
+	public ExportService(TrackingService tracking, ReminderReader reminders, CvService cvVersions, Clock clock) {
 		this.tracking = tracking;
 		this.reminders = reminders;
 		this.cvVersions = cvVersions;
@@ -45,9 +46,17 @@ public class ExportService {
 
 	@Transactional(readOnly = true)
 	public PersonalExport export(long ownerId, String username) {
-		Map<Long, List<Reminder>> remindersByApplication = this.reminders.all(ownerId)
-			.stream()
-			.collect(Collectors.groupingBy(Reminder::getApplicationId));
+		List<ReminderView> allReminders;
+		boolean remindersIncluded = true;
+		try {
+			allReminders = this.reminders.all(ownerId);
+		}
+		catch (RemindersUnavailableException ex) {
+			allReminders = List.of();
+			remindersIncluded = false;
+		}
+		Map<Long, List<ReminderView>> remindersByApplication = allReminders.stream()
+			.collect(Collectors.groupingBy(ReminderView::applicationId));
 		List<ApplicationRecord> applications = this.tracking.list(ownerId, new ApplicationFilter(null, null, true))
 			.stream()
 			.map((application) -> this.tracking.get(ownerId, application.getId()))
@@ -59,10 +68,11 @@ public class ExportService {
 			.map((cv) -> new CvRecord(cv.getId(), cv.getLabel(), cv.getOriginalFilename(), cv.getContentType(),
 					cv.getSizeBytes(), cv.getUploadedAt()))
 			.toList();
-		return new PersonalExport(PersonalExport.FORMAT, Instant.now(this.clock), username, applications, cvs);
+		return new PersonalExport(PersonalExport.FORMAT, Instant.now(this.clock), username, remindersIncluded,
+				applications, cvs);
 	}
 
-	private static ApplicationRecord toRecord(ApplicationDetails details, List<Reminder> reminders) {
+	private static ApplicationRecord toRecord(ApplicationDetails details, List<ReminderView> reminders) {
 		JobApplication application = details.application();
 		TrackedJob job = application.getJob();
 		return new ApplicationRecord(application.getId(), job.getTitle(), job.getCompany(), job.getLocation(),
@@ -75,8 +85,8 @@ public class ExportService {
 							entry.getNote(), entry.getOccurredOn()))
 					.toList(),
 				reminders.stream()
-					.map((reminder) -> new ReminderRecord(reminder.getDueAt(), reminder.getNote(),
-							reminder.getCompletedAt()))
+					.map((reminder) -> new ReminderRecord(reminder.dueAt(), reminder.note(), reminder.status(),
+							reminder.completedAt()))
 					.toList());
 	}
 

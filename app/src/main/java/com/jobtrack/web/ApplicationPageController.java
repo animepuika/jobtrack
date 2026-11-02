@@ -1,13 +1,16 @@
 package com.jobtrack.web;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
 import com.jobtrack.documents.CvService;
 import com.jobtrack.documents.CvVersion;
-import com.jobtrack.reminders.Reminder;
-import com.jobtrack.reminders.ReminderService;
+import com.jobtrack.reminders.ReminderCommands;
+import com.jobtrack.reminders.ReminderReader;
+import com.jobtrack.reminders.ReminderView;
+import com.jobtrack.reminders.RemindersUnavailableException;
 import com.jobtrack.tracking.ApplicationDetails;
 import com.jobtrack.tracking.DuplicateJobException;
 import com.jobtrack.tracking.JobApplication;
@@ -45,14 +48,18 @@ class ApplicationPageController {
 
 	private final CvService cvVersions;
 
-	private final ReminderService reminders;
+	private final ReminderReader reminders;
+
+	private final ReminderCommands reminderCommands;
 
 	private final Clock clock;
 
-	ApplicationPageController(TrackingService tracking, CvService cvVersions, ReminderService reminders, Clock clock) {
+	ApplicationPageController(TrackingService tracking, CvService cvVersions, ReminderReader reminders,
+			ReminderCommands reminderCommands, Clock clock) {
 		this.tracking = tracking;
 		this.cvVersions = cvVersions;
 		this.reminders = reminders;
+		this.reminderCommands = reminderCommands;
 		this.clock = clock;
 	}
 
@@ -108,10 +115,19 @@ class ApplicationPageController {
 			.filter((cv) -> cv.getId().equals(application.getCvVersionId()))
 			.findFirst()
 			.orElse(null));
-		List<Reminder> reminderList = this.reminders.forApplication(user.getId(), id);
-		model.addAttribute("openReminders", reminderList.stream().filter((r) -> !r.isCompleted()).toList());
-		model.addAttribute("doneReminders", reminderList.stream().filter(Reminder::isCompleted).toList());
-		model.addAttribute("now", this.reminders.now());
+		model.addAttribute("remindersUnavailable", false);
+		try {
+			List<ReminderView> reminderList = this.reminders.forApplication(user.getId(), id);
+			model.addAttribute("openReminders", reminderList.stream().filter((r) -> !r.isCompleted()).toList());
+			model.addAttribute("doneReminders", reminderList.stream().filter(ReminderView::isCompleted).toList());
+		}
+		catch (RemindersUnavailableException ex) {
+			model.addAttribute("remindersUnavailable", true);
+			model.addAttribute("openReminders", List.of());
+			model.addAttribute("doneReminders", List.of());
+		}
+		model.addAttribute("pendingReminderChanges", this.reminderCommands.pendingChanges(user.getId()));
+		model.addAttribute("now", Instant.now(this.clock));
 		model.addAttribute("zone", this.clock.getZone());
 		return "application-detail";
 	}

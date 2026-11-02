@@ -1,13 +1,15 @@
 package com.jobtrack.api;
 
 import java.net.URI;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-import com.jobtrack.reminders.Reminder;
-import com.jobtrack.reminders.ReminderService;
+import com.jobtrack.reminders.ReminderCommands;
+import com.jobtrack.reminders.ReminderReader;
+import com.jobtrack.reminders.ReminderView;
 import com.jobtrack.tracking.TrackingService;
 import com.jobtrack.user.JobTrackUser;
 import jakarta.validation.Valid;
@@ -26,43 +28,50 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Reminders, and which CV version an application used.
+ * Reminders, and which CV version an application used. Reminder changes are applied
+ * by the reminder service a moment later, so they answer 202 Accepted.
  */
 @RestController
 class ReminderApiController {
 
-	private final ReminderService reminders;
+	private final ReminderCommands commands;
+
+	private final ReminderReader reader;
 
 	private final TrackingService tracking;
 
-	ReminderApiController(ReminderService reminders, TrackingService tracking) {
-		this.reminders = reminders;
+	ReminderApiController(ReminderCommands commands, ReminderReader reader, TrackingService tracking) {
+		this.commands = commands;
+		this.reader = reader;
 		this.tracking = tracking;
 	}
 
 	@GetMapping("/api/applications/{id}/reminders")
-	List<ReminderResponse> list(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id) {
+	List<ReminderView> list(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id) {
 		this.tracking.requireOwned(user.getId(), id);
-		return this.reminders.forApplication(user.getId(), id).stream().map(ReminderResponse::from).toList();
+		return this.reader.forApplication(user.getId(), id);
 	}
 
 	@PostMapping("/api/applications/{id}/reminders")
-	ResponseEntity<ReminderResponse> add(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id,
+	ResponseEntity<Map<String, Object>> add(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id,
 			@Valid @RequestBody NewReminderRequest request) {
-		Reminder reminder = this.reminders.add(user.getId(), id, request.date(), request.time(), request.note());
-		return ResponseEntity.created(URI.create("/api/reminders/" + reminder.getId()))
-			.body(ReminderResponse.from(reminder));
+		UUID reminderId = this.commands.add(user.getId(), id, request.date(), request.time(), request.note());
+		return ResponseEntity.accepted()
+			.location(URI.create("/api/applications/" + id + "/reminders"))
+			.body(Map.of("id", reminderId, "status", "PENDING"));
 	}
 
 	@PatchMapping("/api/reminders/{id}")
-	ReminderResponse reschedule(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id,
+	ResponseEntity<Void> reschedule(@AuthenticationPrincipal JobTrackUser user, @PathVariable UUID id,
 			@Valid @RequestBody RescheduleRequest request) {
-		return ReminderResponse.from(this.reminders.reschedule(user.getId(), id, request.date(), request.time()));
+		this.commands.reschedule(user.getId(), id, request.date(), request.time());
+		return ResponseEntity.accepted().build();
 	}
 
 	@PostMapping("/api/reminders/{id}/complete")
-	ReminderResponse complete(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id) {
-		return ReminderResponse.from(this.reminders.complete(user.getId(), id));
+	ResponseEntity<Void> complete(@AuthenticationPrincipal JobTrackUser user, @PathVariable UUID id) {
+		this.commands.complete(user.getId(), id);
+		return ResponseEntity.accepted().build();
 	}
 
 	@PutMapping("/api/applications/{id}/cv-version")
@@ -78,15 +87,6 @@ class ReminderApiController {
 	}
 
 	record CvChoiceRequest(Long cvVersionId) {
-	}
-
-	record ReminderResponse(long id, long applicationId, Instant dueAt, String note, Instant completedAt) {
-
-		static ReminderResponse from(Reminder reminder) {
-			return new ReminderResponse(reminder.getId(), reminder.getApplicationId(), reminder.getDueAt(),
-					reminder.getNote(), reminder.getCompletedAt());
-		}
-
 	}
 
 }

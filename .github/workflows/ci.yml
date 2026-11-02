@@ -14,11 +14,16 @@ concurrency:
 
 jobs:
   build:
+    name: ${{ matrix.service }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [app, reminder-service]
     defaults:
       run:
-        working-directory: app
+        working-directory: ${{ matrix.service }}
     steps:
       - uses: actions/checkout@v7
 
@@ -27,18 +32,18 @@ jobs:
           distribution: temurin
           java-version: "25"
           cache: maven
-          cache-dependency-path: app/pom.xml
+          cache-dependency-path: ${{ matrix.service }}/pom.xml
 
-      # Integration tests start PostgreSQL 18 in Docker with Testcontainers. No test
-      # contacts HiringCafe; the adapter is tested against a local fake server.
+      # Integration tests start PostgreSQL 18 (and, for the reminder service, Azurite)
+      # in Docker with Testcontainers. No test contacts HiringCafe.
       - name: Test and package
         run: ./mvnw -B verify
 
       - name: Build the Docker image
-        run: docker build --tag jobtrack:ci .
+        run: docker build --tag ${{ matrix.service }}:ci .
 
       - name: Check the image holds only the app
         run: |
-          files="$(docker run --rm --entrypoint find jobtrack:ci /app -type f)"
+          files="$(docker run --rm --entrypoint find ${{ matrix.service }}:ci /app -type f)"
           echo "$files"
           test "$files" = "/app/app.jar"

@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 
 import com.jobtrack.documents.CvService;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -32,13 +33,16 @@ public class TrackingService {
 
 	private final CvService cvVersions;
 
+	private final ApplicationEventPublisher events;
+
 	private final Clock clock;
 
 	public TrackingService(TrackedJobRepository jobs, JobApplicationRepository applications, CvService cvVersions,
-			Clock clock) {
+			ApplicationEventPublisher events, Clock clock) {
 		this.jobs = jobs;
 		this.applications = applications;
 		this.cvVersions = cvVersions;
+		this.events = events;
 		this.clock = clock;
 	}
 
@@ -139,7 +143,11 @@ public class TrackingService {
 
 	public JobApplication setArchived(long ownerId, long applicationId, boolean archived) {
 		JobApplication application = findOwned(ownerId, applicationId);
+		boolean wasArchived = application.isArchived();
 		application.setArchived(archived, today(), Instant.now(this.clock));
+		if (archived && !wasArchived) {
+			this.events.publishEvent(new ApplicationArchivedEvent(ownerId, applicationId));
+		}
 		return application;
 	}
 
