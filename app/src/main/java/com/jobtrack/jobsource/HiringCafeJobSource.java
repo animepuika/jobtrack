@@ -4,6 +4,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,6 +47,8 @@ class HiringCafeJobSource implements JobSource {
 
 	private static final int MAX_ATTEMPTS = 2;
 
+	private static final double KM_PER_MILE = 1.609344;
+
 	private static final Pattern JOB_ID_LINE = Pattern.compile("\\*\\*Job ID:\\*\\*\\s*(\\S+)");
 
 	private final HiringCafeProperties properties;
@@ -74,22 +77,7 @@ class HiringCafeJobSource implements JobSource {
 
 	@Override
 	public JobSearchPage search(JobSearchQuery query) {
-		Map<String, Object> arguments = new LinkedHashMap<>();
-		arguments.put("search", query.keywords());
-		if (query.location() != null) {
-			arguments.put("location", query.location());
-		}
-		if (query.workplace() != null) {
-			arguments.put("workplace_types", List.of(query.workplace().label()));
-		}
-		if (query.seniority() != null) {
-			arguments.put("seniority_levels", List.of(query.seniority().label()));
-		}
-		if (!query.excludedCompanies().isEmpty()) {
-			arguments.put("exclude_company_names", query.excludedCompanies());
-		}
-		arguments.put("limit", this.properties.maxResults());
-		ToolResult result = callTool("search_jobs", arguments);
+		ToolResult result = callTool("search_jobs", arguments(query, this.properties.maxResults()));
 		JobCards cards = (result.meta() != null) ? result.meta().get(JOB_CARDS) : null;
 		if (cards == null || cards.jobs() == null) {
 			throw new JobSourceException("HiringCafe answered in an unexpected format");
@@ -101,6 +89,76 @@ class HiringCafeJobSource implements JobSource {
 		}
 		int total = (cards.total() != null) ? cards.total() : results.size();
 		return new JobSearchPage(List.copyOf(results), total);
+	}
+
+	/**
+	 * Turns the query into {@code search_jobs} arguments. Only filters that are set are
+	 * sent; the names and allowed values are the ones listed by {@code tools/list} on
+	 * 2026-11-03.
+	 */
+	static Map<String, Object> arguments(JobSearchQuery query, int limit) {
+		Map<String, Object> arguments = new LinkedHashMap<>();
+		putIfPresent(arguments, "search", query.keywords());
+		putIfPresent(arguments, "location", query.location());
+		if (query.location() != null && query.radiusKm() != null) {
+			arguments.put("radius_miles", Math.max(1, Math.round(query.radiusKm() / KM_PER_MILE)));
+		}
+		putValues(arguments, "workplace_types", query.workplaces());
+		putValues(arguments, "seniority_levels", query.seniorities());
+		putValues(arguments, "employment_types", query.employmentTypes());
+		if (query.roleType() != null) {
+			arguments.put("role_type", query.roleType().value());
+		}
+		putIfPresent(arguments, "posted_within_days", query.postedWithinDays());
+		putIfPresent(arguments, "max_years_experience", query.maxYearsExperience());
+		if (query.minPay() != null) {
+			arguments.put("min_salary", query.minPay());
+			arguments.put("salary_frequency", query.payPeriod().value());
+		}
+		if (query.publishedPayOnly()) {
+			arguments.put("posted_salary_only", true);
+		}
+		putValues(arguments, "departments", query.departments());
+		putValues(arguments, "industries", query.industries());
+		putValues(arguments, "exclude_industries", query.excludedIndustries());
+		if (query.companySize() != null) {
+			putIfPresent(arguments, "min_employees", query.companySize().minEmployees());
+			putIfPresent(arguments, "max_employees", query.companySize().maxEmployees());
+		}
+		putValues(arguments, "organization_types", query.organizationTypes());
+		if (query.noDegreeRequired()) {
+			arguments.put("bachelors_degree_requirement", List.of("Preferred", "Not Mentioned"));
+		}
+		putList(arguments, "language_requirements", query.languages());
+		putList(arguments, "company_hq_countries", query.companyCountries());
+		putList(arguments, "company_names", query.onlyCompanies());
+		putList(arguments, "exclude_company_names", query.excludedCompanies());
+		putValues(arguments, "benefits_and_perks", query.perks());
+		if (query.quickApplyOnly()) {
+			arguments.put("application_form_ease", List.of("Simple"));
+		}
+		putIfPresent(arguments, "max_per_company", query.jobsPerCompany());
+		arguments.put("limit", limit);
+		return arguments;
+	}
+
+	private static void putIfPresent(Map<String, Object> arguments, String name, Object value) {
+		if (value != null) {
+			arguments.put(name, value);
+		}
+	}
+
+	private static void putValues(Map<String, Object> arguments, String name,
+			Collection<? extends JobSearchQuery.Option> options) {
+		if (!options.isEmpty()) {
+			arguments.put(name, options.stream().map(JobSearchQuery.Option::value).toList());
+		}
+	}
+
+	private static void putList(Map<String, Object> arguments, String name, List<String> values) {
+		if (!values.isEmpty()) {
+			arguments.put(name, values);
+		}
 	}
 
 	private ToolResult callTool(String tool, Map<String, Object> arguments) {

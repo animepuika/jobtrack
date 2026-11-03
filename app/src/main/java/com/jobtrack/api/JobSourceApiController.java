@@ -44,7 +44,7 @@ class JobSourceApiController {
 	SearchResponse search(@AuthenticationPrincipal JobTrackUser user, @RequestParam String keywords,
 			@RequestParam(required = false) String location, @RequestParam(required = false) Workplace workplace,
 			@RequestParam(required = false) Seniority seniority) {
-		JobSearchPage page = this.jobSource.search(new JobSearchQuery(keywords, location, workplace, seniority));
+		JobSearchPage page = this.jobSource.search(JobSearchQuery.of(keywords, location, workplace, seniority));
 		Map<String, Long> tracked = this.tracking.findTrackedApplicationIds(user.getId(), this.jobSource.provider(),
 				page.results().stream().map(JobSearchResult::externalId).toList());
 		List<SearchResultResponse> results = page.results()

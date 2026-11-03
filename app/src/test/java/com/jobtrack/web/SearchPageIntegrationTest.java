@@ -7,9 +7,14 @@ import com.jobtrack.IntegrationTest;
 import com.jobtrack.TestUsers;
 import com.jobtrack.jobsource.JobSearchPage;
 import com.jobtrack.jobsource.JobSearchQuery;
+import com.jobtrack.jobsource.JobSearchQuery.Industry;
+import com.jobtrack.jobsource.JobSearchQuery.PayPeriod;
+import com.jobtrack.jobsource.JobSearchQuery.Workplace;
 import com.jobtrack.jobsource.JobSearchResult;
 import com.jobtrack.jobsource.JobSource;
 import com.jobtrack.jobsource.JobSourceException;
+import com.jobtrack.jobsource.SavedSearch;
+import com.jobtrack.jobsource.SavedSearchService;
 import com.jobtrack.matching.SkillProfileService;
 import com.jobtrack.tracking.SourceProvider;
 import com.jobtrack.user.JobTrackUser;
@@ -34,6 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,6 +63,9 @@ class SearchPageIntegrationTest {
 	@Autowired
 	private SkillProfileService skills;
 
+	@Autowired
+	private SavedSearchService savedSearches;
+
 	@MockitoBean
 	private JobSource jobSource;
 
@@ -67,6 +76,104 @@ class SearchPageIntegrationTest {
 		this.user = this.users.create();
 		given(this.jobSource.isEnabled()).willReturn(true);
 		given(this.jobSource.provider()).willReturn(SourceProvider.HIRINGCAFE);
+	}
+
+	@Test
+	void filtersFromTheAddressReachTheQueryAndAreListed() throws Exception {
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 3));
+
+		this.mvc
+			.perform(get("/search").param("keywords", "java")
+				.param("workplace", "REMOTE", "HYBRID")
+				.param("posted", "7")
+				.param("pay", "2500")
+				.param("payPeriod", "MONTHLY")
+				.param("skipIndustry", "OIL_GAS")
+				.param("hideCompanies", "Sample Staffing, Other Agency")
+				.param("distance", "")
+				.with(user(this.user)))
+			.andExpect(status().isOk())
+			.andExpect(content().string(containsString("<li>Remote or Hybrid</li>")))
+			.andExpect(content().string(containsString("<li>Posted in the last 7 days</li>")))
+			.andExpect(content().string(containsString("<li>At least $2,500 a month</li>")))
+			.andExpect(content().string(containsString("More filters")))
+			.andExpect(content().string(containsString(
+					"value=\"keywords=java&amp;workplace=REMOTE&amp;workplace=HYBRID&amp;posted=7&amp;pay=2500&amp;payPeriod=MONTHLY&amp;skipIndustry=OIL_GAS&amp;hideCompanies=Sample+Staffing%2C+Other+Agency\"")));
+		ArgumentCaptor<JobSearchQuery> query = ArgumentCaptor.forClass(JobSearchQuery.class);
+		verify(this.jobSource).search(query.capture());
+		assertThat(query.getValue().workplaces()).containsExactly(Workplace.REMOTE, Workplace.HYBRID);
+		assertThat(query.getValue().postedWithinDays()).isEqualTo(7);
+		assertThat(query.getValue().minPay()).isEqualTo(2500);
+		assertThat(query.getValue().payPeriod()).isEqualTo(PayPeriod.MONTHLY);
+		assertThat(query.getValue().excludedIndustries()).containsExactly(Industry.OIL_GAS);
+		assertThat(query.getValue().excludedCompanies()).containsExactly("Sample Staffing", "Other Agency");
+		assertThat(query.getValue().radiusKm()).isNull();
+	}
+
+	@Test
+	void filtersAloneAreEnoughToSearch() throws Exception {
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 3));
+
+		this.mvc.perform(get("/search").param("workplace", "REMOTE").with(user(this.user)))
+			.andExpect(content().string(containsString("Junior Java Developer")));
+	}
+
+	@Test
+	void aFilterThatIsNotUnderstoodIsReportedWithoutSearching() throws Exception {
+		this.mvc.perform(get("/search").param("keywords", "java").param("posted", "soon").with(user(this.user)))
+			.andExpect(status().isOk())
+			.andExpect(content().string(containsString("understood: posted. Check them")));
+		verify(this.jobSource, times(0)).search(any(JobSearchQuery.class));
+	}
+
+	@Test
+	void savedSearchesCanBeSavedRenamedRunAndRemoved() throws Exception {
+		String query = "keywords=java&workplace=REMOTE";
+		this.mvc
+			.perform(post("/search/saved").with(user(this.user))
+				.with(csrf())
+				.param("name", "Remote Java")
+				.param("query", query))
+			.andExpect(redirectedUrl("/search?" + query))
+			.andExpect(flash().attribute("success",
+					"Saved as “Remote Java”. Run it any time from the top of this page."));
+		this.mvc
+			.perform(post("/search/saved").with(user(this.user))
+				.with(csrf())
+				.param("name", "remote java")
+				.param("query", "keywords=java&workplace=HYBRID"))
+			.andExpect(flash().attribute("success", "Updated the saved search “remote java”."));
+
+		List<SavedSearch> saved = this.savedSearches.list(this.user.getId());
+		assertThat(saved).singleElement().satisfies((search) -> {
+			assertThat(search.getName()).isEqualTo("Remote Java");
+			assertThat(search.getQuery()).isEqualTo("keywords=java&workplace=HYBRID");
+		});
+		this.mvc.perform(get("/search").with(user(this.user)))
+			.andExpect(content().string(containsString("href=\"/search?keywords=java&amp;workplace=HYBRID\"")));
+
+		JobTrackUser other = this.users.create();
+		this.mvc
+			.perform(post("/search/saved/{id}/delete", saved.getFirst().getId()).with(user(other)).with(csrf()))
+			.andExpect(redirectedUrl("/search"));
+		assertThat(this.savedSearches.list(this.user.getId())).hasSize(1);
+
+		this.mvc
+			.perform(post("/search/saved/{id}/delete", saved.getFirst().getId()).with(user(this.user)).with(csrf()))
+			.andExpect(flash().attribute("success", "Saved search removed."));
+		assertThat(this.savedSearches.list(this.user.getId())).isEmpty();
+	}
+
+	@Test
+	void aSavedQueryMustBePlainAddressParameters() throws Exception {
+		this.mvc
+			.perform(post("/search/saved").with(user(this.user))
+				.with(csrf())
+				.param("name", "Odd")
+				.param("query", "keywords=java\r\nLocation: https://example.com"))
+			.andExpect(redirectedUrl("/search"))
+			.andExpect(flash().attribute("error", "This search can't be saved: run a search first"));
+		assertThat(this.savedSearches.list(this.user.getId())).isEmpty();
 	}
 
 	@Test

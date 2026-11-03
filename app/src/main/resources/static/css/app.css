@@ -434,3 +434,33 @@ details.reschedule form { margin-top: 8px; }
 .skill-list button.remove { min-height: 36px; min-width: 36px; padding: 0; border: 0; background: transparent; color: var(--ink-3); font-size: 1.2rem; }
 .skill-list button.remove:hover { color: var(--danger); }
 .pager .summary .first-page { margin-left: 12px; font-size: var(--text-sm); }
+
+/* Search: saved searches, quick filters, the More filters panel */
+.saved-searches { margin: 0 0 var(--space-4); }
+.saved-searches h2 { margin: 0 0 6px; }
+.saved-searches ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.saved-searches li { display: inline-flex; align-items: center; gap: 2px; padding-left: 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface); }
+.saved-searches li a { font-weight: 600; text-decoration: none; padding: 6px 0; }
+.saved-searches button.remove { min-height: 36px; min-width: 36px; padding: 0; border: 0; background: transparent; color: var(--ink-3); font-size: 1.2rem; }
+.saved-searches button.remove:hover { color: var(--danger); }
+.search-form { flex-direction: column; align-items: stretch; }
+.search-main { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-4); }
+.search-main .field.keywords { flex: 2 1 300px; }
+.search-main .field.location { flex: 1 1 200px; }
+.search-quick { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-4); }
+.search-form > .hint { margin: -8px 0 0; }
+.more-filters > summary { padding-left: 0; }
+.more-filters[open] > summary { margin-bottom: 8px; }
+.filter-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--space-4); }
+.filter-group { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.filter-group > legend { float: left; width: 100%; margin-bottom: 2px; font-size: var(--text-base); }
+.filter-field { display: flex; flex-direction: column; gap: 5px; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.filter-row .field { flex: 1 1 140px; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 4px 12px; }
+.check-grid label, label.check { display: flex; align-items: center; gap: 8px; font-weight: 400; font-size: var(--text-sm); min-height: 32px; }
+.more-filters .nested > summary { padding-left: 0; font-size: var(--text-sm); }
+.more-filters > .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: var(--space-4); }
+.active-filters { margin: 0 0 8px; }
+.save-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
+.save-search input { flex: 1 1 260px; max-width: 420px; }

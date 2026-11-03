@@ -10,7 +10,17 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
+import com.jobtrack.jobsource.JobSearchQuery.CompanySize;
+import com.jobtrack.jobsource.JobSearchQuery.Department;
+import com.jobtrack.jobsource.JobSearchQuery.EmploymentType;
+import com.jobtrack.jobsource.JobSearchQuery.Industry;
+import com.jobtrack.jobsource.JobSearchQuery.OrganizationType;
+import com.jobtrack.jobsource.JobSearchQuery.PayPeriod;
+import com.jobtrack.jobsource.JobSearchQuery.Perk;
+import com.jobtrack.jobsource.JobSearchQuery.RoleType;
 import com.jobtrack.jobsource.JobSearchQuery.Seniority;
 import com.jobtrack.jobsource.JobSearchQuery.Workplace;
 import com.sun.net.httpserver.HttpExchange;
@@ -56,7 +66,7 @@ class HiringCafeJobSourceTest {
 		this.responses.add(new StubResponse(200, fixture("search-response.json"), null, 0));
 
 		JobSearchPage page = this.jobSource
-			.search(new JobSearchQuery("Java developer", "Latvia", Workplace.HYBRID, Seniority.ENTRY));
+			.search(JobSearchQuery.of("Java developer", "Latvia", Workplace.HYBRID, Seniority.ENTRY));
 
 		assertThat(page.total()).isEqualTo(12);
 		assertThat(page.results()).hasSize(2);
@@ -76,7 +86,7 @@ class HiringCafeJobSourceTest {
 	void sendsAnMcpToolCall() throws IOException {
 		this.responses.add(new StubResponse(200, fixture("search-response.json"), null, 0));
 
-		this.jobSource.search(new JobSearchQuery("Java developer", "Latvia", Workplace.REMOTE, null));
+		this.jobSource.search(JobSearchQuery.of("Java developer", "Latvia", Workplace.REMOTE, null));
 
 		assertThat(this.requestBodies).singleElement()
 			.satisfies((body) -> assertThat(body).contains("\"method\":\"tools/call\"")
@@ -92,12 +102,82 @@ class HiringCafeJobSourceTest {
 	void leavesOutCompaniesAlreadyShownForTheNextPage() throws IOException {
 		this.responses.add(new StubResponse(200, fixture("search-response.json"), null, 0));
 
-		this.jobSource.search(new JobSearchQuery("Java", null, null, null,
-				List.of("Example Logistics", " Sample & Sons ", "Example Logistics")));
+		this.jobSource.search(JobSearchQuery.builder("Java")
+			.excludedCompanies(List.of("Example Logistics", " Sample & Sons ", "Example Logistics"))
+			.build());
 
 		assertThat(this.requestBodies).singleElement()
 			.satisfies((body) -> assertThat(body)
 				.contains("\"exclude_company_names\":[\"Example Logistics\",\"Sample & Sons\"]"));
+	}
+
+	@Test
+	void sendsEveryChosenFilterWithHiringCafesNamesAndValues() {
+		JobSearchQuery query = JobSearchQuery.builder(null)
+			.location("Riga")
+			.radiusKm(40)
+			.workplaces(Set.of(Workplace.REMOTE, Workplace.HYBRID))
+			.seniorities(Set.of(Seniority.ENTRY))
+			.employmentTypes(Set.of(EmploymentType.FULL_TIME, EmploymentType.INTERNSHIP))
+			.roleType(RoleType.INDIVIDUAL)
+			.postedWithinDays(7)
+			.maxYearsExperience(2)
+			.minPay(2500, PayPeriod.MONTHLY)
+			.publishedPayOnly(true)
+			.departments(Set.of(Department.SOFTWARE))
+			.industries(Set.of(Industry.FINTECH))
+			.excludedIndustries(Set.of(Industry.OIL_GAS))
+			.companySize(CompanySize.SMALL)
+			.organizationTypes(Set.of(OrganizationType.PRIVATE))
+			.noDegreeRequired(true)
+			.languages(List.of("English"))
+			.companyCountries(List.of("Latvia"))
+			.onlyCompanies(List.of("Example Logistics"))
+			.excludedCompanies(List.of("Sample Staffing"))
+			.perks(Set.of(Perk.VISA))
+			.quickApplyOnly(true)
+			.jobsPerCompany(3)
+			.build();
+
+		Map<String, Object> arguments = HiringCafeJobSource.arguments(query, 10);
+
+		assertThat(arguments).doesNotContainKey("search")
+			.containsEntry("location", "Riga")
+			.containsEntry("radius_miles", 25L)
+			.containsEntry("workplace_types", List.of("Remote", "Hybrid"))
+			.containsEntry("seniority_levels", List.of("Entry Level"))
+			.containsEntry("employment_types", List.of("Full Time", "Internship"))
+			.containsEntry("role_type", "Individual Contributor")
+			.containsEntry("posted_within_days", 7)
+			.containsEntry("max_years_experience", 2)
+			.containsEntry("min_salary", 2500)
+			.containsEntry("salary_frequency", "Monthly")
+			.containsEntry("posted_salary_only", true)
+			.containsEntry("departments", List.of("Software Development"))
+			.containsEntry("industries", List.of("Financial Technology"))
+			.containsEntry("exclude_industries", List.of("Oil & Gas"))
+			.containsEntry("min_employees", 51)
+			.containsEntry("max_employees", 500)
+			.containsEntry("organization_types", List.of("private"))
+			.containsEntry("bachelors_degree_requirement", List.of("Preferred", "Not Mentioned"))
+			.containsEntry("language_requirements", List.of("English"))
+			.containsEntry("company_hq_countries", List.of("Latvia"))
+			.containsEntry("company_names", List.of("Example Logistics"))
+			.containsEntry("exclude_company_names", List.of("Sample Staffing"))
+			.containsEntry("benefits_and_perks", List.of("visa_sponsorship"))
+			.containsEntry("application_form_ease", List.of("Simple"))
+			.containsEntry("max_per_company", 3)
+			.containsEntry("limit", 10);
+	}
+
+	@Test
+	void anEmptySearchIsRejectedButFiltersAloneAreEnough() {
+		assertThatExceptionOfType(IllegalArgumentException.class)
+			.isThrownBy(() -> JobSearchQuery.builder(" ").excludedCompanies(List.of("Example Logistics")).build())
+			.withMessage("Enter keywords or choose at least one filter");
+		assertThat(JobSearchQuery.builder(null).postedWithinDays(1).build().keywords()).isNull();
+		assertThatExceptionOfType(IllegalArgumentException.class)
+			.isThrownBy(() -> JobSearchQuery.builder("Java").jobsPerCompany(9).build());
 	}
 
 	@Test
@@ -107,7 +187,7 @@ class HiringCafeJobSourceTest {
 				""", null, 0));
 
 		assertThatExceptionOfType(JobSourceException.class)
-			.isThrownBy(() -> this.jobSource.search(new JobSearchQuery("Java", null, null, null)))
+			.isThrownBy(() -> this.jobSource.search(JobSearchQuery.of("Java", null, null, null)))
 			.withMessageContaining("Invalid filter");
 	}
 
@@ -116,7 +196,7 @@ class HiringCafeJobSourceTest {
 		this.responses.add(new StubResponse(429, "{}", "30", 0));
 
 		assertThatExceptionOfType(JobSourceException.class)
-			.isThrownBy(() -> this.jobSource.search(new JobSearchQuery("Java", null, null, null)))
+			.isThrownBy(() -> this.jobSource.search(JobSearchQuery.of("Java", null, null, null)))
 			.satisfies((ex) -> assertThat(ex.getRetryAfter()).isEqualTo(Duration.ofSeconds(30)));
 		assertThat(this.requestBodies).hasSize(1);
 	}
@@ -126,7 +206,7 @@ class HiringCafeJobSourceTest {
 		this.responses.add(new StubResponse(503, "{}", null, 0));
 		this.responses.add(new StubResponse(200, fixture("search-response.json"), null, 0));
 
-		JobSearchPage page = this.jobSource.search(new JobSearchQuery("Java", null, null, null));
+		JobSearchPage page = this.jobSource.search(JobSearchQuery.of("Java", null, null, null));
 
 		assertThat(page.results()).hasSize(2);
 		assertThat(this.requestBodies).hasSize(2);
@@ -138,7 +218,7 @@ class HiringCafeJobSourceTest {
 		this.responses.add(new StubResponse(200, "{}", null, 1500));
 
 		assertThatExceptionOfType(JobSourceException.class)
-			.isThrownBy(() -> this.jobSource.search(new JobSearchQuery("Java", null, null, null)))
+			.isThrownBy(() -> this.jobSource.search(JobSearchQuery.of("Java", null, null, null)))
 			.withMessage("HiringCafe did not respond in time");
 	}
 
@@ -147,7 +227,7 @@ class HiringCafeJobSourceTest {
 		this.server.stop(0);
 
 		assertThatExceptionOfType(JobSourceException.class)
-			.isThrownBy(() -> this.jobSource.search(new JobSearchQuery("Java", null, null, null)))
+			.isThrownBy(() -> this.jobSource.search(JobSearchQuery.of("Java", null, null, null)))
 			.withMessageStartingWith("HiringCafe could not be reached");
 	}
 
@@ -158,7 +238,7 @@ class HiringCafeJobSourceTest {
 				""", null, 0));
 
 		assertThatExceptionOfType(JobSourceException.class)
-			.isThrownBy(() -> this.jobSource.search(new JobSearchQuery("Java", null, null, null)))
+			.isThrownBy(() -> this.jobSource.search(JobSearchQuery.of("Java", null, null, null)))
 			.withMessage("HiringCafe answered in an unexpected format");
 	}
 

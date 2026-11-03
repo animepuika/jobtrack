@@ -15,42 +15,214 @@
 		<a class="button primary" th:href="@{/applications/new}"><svg th:replace="~{fragments :: icon-plus}"></svg>Add a job by hand</a>
 	</div>
 
+	<section th:if="${searchEnabled and !savedSearches.isEmpty()}" class="saved-searches" aria-labelledby="saved-heading">
+		<h2 id="saved-heading" class="label">Your saved searches</h2>
+		<ul>
+			<li th:each="s : ${savedSearches}">
+				<a th:href="@{${'/search?' + s.query}}" th:text="${s.name}">Remote Java, Riga</a>
+				<form th:action="@{/search/saved/{id}/delete(id=${s.id})}" method="post">
+					<button type="submit" class="remove" th:attr="aria-label='Remove saved search ' + ${s.name}"
+						title="Remove">×</button>
+				</form>
+			</li>
+		</ul>
+	</section>
+
 	<form th:if="${searchEnabled}" id="search-form" th:action="@{/search}" method="get" class="card search-form"
-		role="search" aria-label="Search HiringCafe">
-		<div class="field keywords">
-			<label for="keywords">Keywords <span class="required">(required)</span></label>
-			<input id="keywords" type="search" name="keywords" th:value="${keywords}" placeholder="Junior Java developer" required>
-		</div>
-		<div class="field location">
-			<label for="location">Location <span class="optional">(optional)</span></label>
-			<input id="location" type="text" name="location" th:value="${location}" placeholder="Riga">
-		</div>
-		<fieldset>
-			<legend>Workplace</legend>
-			<div class="choice-row">
-				<label class="choice"><input type="radio" name="workplace" value="" th:checked="${workplace == null}"> Any</label>
-				<label class="choice" th:each="w : ${workplaces}"><input type="radio" name="workplace" th:value="${w}"
-					th:checked="${w == workplace}"> <span th:text="${w.label()}">Remote</span></label>
+		role="search" aria-label="Search HiringCafe" th:object="${form}">
+		<div class="search-main">
+			<div class="field keywords">
+				<label for="keywords">Keywords</label>
+				<input id="keywords" type="search" th:field="*{keywords}" placeholder="Junior Java developer">
 			</div>
-		</fieldset>
-		<fieldset>
-			<legend>Seniority</legend>
-			<div class="choice-row">
-				<label class="choice"><input type="radio" name="seniority" value="" th:checked="${seniority == null}"> Any</label>
-				<label class="choice" th:each="s : ${seniorities}"><input type="radio" name="seniority" th:value="${s}"
-					th:checked="${s == seniority}"> <span th:text="${s.shortLabel()}">Entry</span></label>
+			<div class="field location">
+				<label for="location">Location <span class="optional">(optional)</span></label>
+				<input id="location" type="text" th:field="*{location}" placeholder="Riga, Latvia or remote">
 			</div>
-		</fieldset>
-		<button type="submit" class="primary"><svg th:replace="~{fragments :: icon-search}"></svg>Search</button>
+			<button type="submit" class="primary"><svg th:replace="~{fragments :: icon-search}"></svg>Search</button>
+		</div>
+
+		<div class="search-quick">
+			<fieldset>
+				<legend>Workplace</legend>
+				<div class="choice-row">
+					<label class="choice" th:each="w : ${options.workplaces()}"><input type="checkbox" name="workplace"
+						th:value="${w}" th:checked="${form.workplace.contains(w)}"> <span th:text="${w.label()}">Remote</span></label>
+				</div>
+			</fieldset>
+			<fieldset>
+				<legend>Seniority</legend>
+				<div class="choice-row">
+					<label class="choice" th:each="s : ${options.seniorities()}"><input type="checkbox" name="seniority"
+						th:value="${s}" th:checked="${form.seniority.contains(s)}"> <span th:text="${s.label()}">Entry</span></label>
+				</div>
+			</fieldset>
+			<div class="field">
+				<label for="posted">Posted</label>
+				<select id="posted" name="posted">
+					<option value="">Any time</option>
+					<option th:each="d : ${options.postedDays()}" th:value="${d}" th:selected="${form.posted == d}"
+						th:text="${d == 1} ? 'Today' : 'Last ' + ${d} + ' days'">Last 7 days</option>
+				</select>
+			</div>
+		</div>
+		<p class="hint">Pick none for any. Ticking several in a group means any of them.</p>
+
+		<details class="more-filters" th:open="${form.moreFilterCount() > 0}">
+			<summary>More filters<span th:if="${form.moreFilterCount() > 0}" th:text="' (' + ${form.moreFilterCount()} + ' on)'"> (2 on)</span></summary>
+			<div class="filter-groups">
+				<fieldset class="filter-group">
+					<legend>The job</legend>
+					<div class="filter-field">
+						<span class="label">Employment type</span>
+						<div class="choice-row">
+							<label class="choice" th:each="t : ${options.employmentTypes()}"><input type="checkbox" name="type"
+								th:value="${t}" th:checked="${form.type.contains(t)}"> <span th:text="${t.label()}">Full time</span></label>
+						</div>
+					</div>
+					<div class="filter-row">
+						<div class="field">
+							<label for="role">People management</label>
+							<select id="role" name="role">
+								<option value="">Either</option>
+								<option th:each="r : ${options.roleTypes()}" th:value="${r}" th:selected="${form.role == r}"
+									th:text="${r.label()}">Not managing people</option>
+							</select>
+						</div>
+						<div class="field">
+							<label for="experience">Most years of experience asked</label>
+							<input id="experience" type="number" min="0" max="50" inputmode="numeric" th:field="*{experience}" placeholder="2">
+						</div>
+						<div class="field">
+							<label for="perCompany">Jobs per company</label>
+							<select id="perCompany" name="perCompany">
+								<option value="">1 (default)</option>
+								<option th:each="n : ${#numbers.sequence(2, 5)}" th:value="${n}" th:selected="${form.perCompany == n}"
+									th:text="${n}">3</option>
+							</select>
+						</div>
+					</div>
+					<div class="filter-field">
+						<span class="label">Field</span>
+						<div class="check-grid">
+							<label th:each="d : ${options.departments()}"><input type="checkbox" name="department" th:value="${d}"
+								th:checked="${form.department.contains(d)}"> <span th:text="${d.label()}">Software Development</span></label>
+						</div>
+					</div>
+				</fieldset>
+
+				<fieldset class="filter-group">
+					<legend>Pay</legend>
+					<div class="filter-row">
+						<div class="field">
+							<label for="pay">Minimum pay in US dollars</label>
+							<input id="pay" type="number" min="0" step="100" inputmode="numeric" th:field="*{pay}" placeholder="40000">
+						</div>
+						<div class="field">
+							<label for="payPeriod">Per</label>
+							<select id="payPeriod" name="payPeriod">
+								<option th:each="p : ${options.payPeriods()}" th:value="${p}" th:selected="${form.payPeriod == p}"
+									th:text="${#strings.substringAfter(p.label(), ' ')}">year</option>
+							</select>
+						</div>
+					</div>
+					<label class="check"><input type="checkbox" name="publishedPay" value="true" th:checked="${form.publishedPay}">
+						Only jobs that publish their pay</label>
+					<p class="hint">HiringCafe compares pay in US dollars and skips jobs with unknown pay when a minimum is set.</p>
+				</fieldset>
+
+				<fieldset class="filter-group">
+					<legend>Place and language</legend>
+					<div class="filter-row">
+						<div class="field">
+							<label for="distance">Distance from the location</label>
+							<select id="distance" name="distance">
+								<option value="">About 80 km (default)</option>
+								<option th:each="k : ${options.distancesKm()}" th:value="${k}" th:selected="${form.distance == k}"
+									th:text="'Within ' + ${k} + ' km'">Within 25 km</option>
+							</select>
+						</div>
+						<div class="field">
+							<label for="languages">Languages the job needs</label>
+							<input id="languages" type="text" th:field="*{languages}" placeholder="English, Latvian">
+						</div>
+						<div class="field">
+							<label for="countries">Company based in</label>
+							<input id="countries" type="text" th:field="*{countries}" placeholder="Latvia, Germany">
+						</div>
+					</div>
+					<p class="hint">Distance only works with a city. Separate several entries with commas.</p>
+				</fieldset>
+
+				<fieldset class="filter-group">
+					<legend>The company</legend>
+					<div class="filter-row">
+						<div class="field">
+							<label for="size">Company size</label>
+							<select id="size" name="size">
+								<option value="">Any size</option>
+								<option th:each="c : ${options.companySizes()}" th:value="${c}" th:selected="${form.size == c}"
+									th:text="${c.label()}">51 to 500</option>
+							</select>
+						</div>
+						<div class="field">
+							<label for="companies">Only these companies</label>
+							<input id="companies" type="text" th:field="*{companies}" placeholder="Example Ltd">
+						</div>
+						<div class="field">
+							<label for="hideCompanies">Hide these companies</label>
+							<input id="hideCompanies" type="text" th:field="*{hideCompanies}" placeholder="Staffing agencies you skip">
+						</div>
+					</div>
+					<div class="filter-field">
+						<span class="label">Type</span>
+						<div class="choice-row">
+							<label class="choice" th:each="o : ${options.organizationTypes()}"><input type="checkbox" name="org"
+								th:value="${o}" th:checked="${form.org.contains(o)}"> <span th:text="${o.label()}">Private company</span></label>
+						</div>
+					</div>
+					<details class="nested" th:open="${!form.industry.isEmpty()}">
+						<summary>Only these industries<span th:unless="${form.industry.isEmpty()}" th:text="' (' + ${form.industry.size()} + ')'"></span></summary>
+						<div class="check-grid">
+							<label th:each="i : ${options.industries()}"><input type="checkbox" name="industry" th:value="${i}"
+								th:checked="${form.industry.contains(i)}"> <span th:text="${i.label()}">Fintech</span></label>
+						</div>
+					</details>
+					<details class="nested" th:open="${!form.skipIndustry.isEmpty()}">
+						<summary>Leave out industries<span th:unless="${form.skipIndustry.isEmpty()}" th:text="' (' + ${form.skipIndustry.size()} + ')'"></span></summary>
+						<div class="check-grid">
+							<label th:each="i : ${options.industries()}"><input type="checkbox" name="skipIndustry" th:value="${i}"
+								th:checked="${form.skipIndustry.contains(i)}"> <span th:text="${i.label()}">Oil &amp; Gas</span></label>
+						</div>
+					</details>
+				</fieldset>
+
+				<fieldset class="filter-group">
+					<legend>Extras</legend>
+					<div class="check-grid">
+						<label th:each="p : ${options.perks()}"><input type="checkbox" name="perk" th:value="${p}"
+							th:checked="${form.perk.contains(p)}"> <span th:text="${p.label()}">Visa sponsorship</span></label>
+					</div>
+					<label class="check"><input type="checkbox" name="noDegree" value="true" th:checked="${form.noDegree}">
+						No degree required</label>
+					<label class="check"><input type="checkbox" name="quickApply" value="true" th:checked="${form.quickApply}">
+						Quick applications only</label>
+				</fieldset>
+			</div>
+			<div class="actions">
+				<button type="submit" class="primary"><svg th:replace="~{fragments :: icon-search}"></svg>Search with these filters</button>
+				<a class="button subtle" th:href="@{/search(keywords=${form.keywords})}">Clear all filters</a>
+			</div>
+		</details>
 	</form>
 
-	<p th:if="${searchEnabled and hasSkills and (keywords == null or keywords.isBlank())}" class="hint">
+	<p th:if="${searchEnabled and hasSkills and form.isEmpty()}" class="hint">
 		<a th:href="@{/search(keywords=${skillSearch})}">Search with my skills</a> (<span th:text="${skillSearch}">java spring boot</span>)
 		· <a th:href="@{/skills}">Edit your skills</a></p>
-	<div th:if="${searchEnabled and (keywords == null or keywords.isBlank())}" class="empty narrow-card">
-		<p class="empty-title">Start with a few keywords</p>
-		<p class="empty-text">A job title or a skill works best, like “junior java developer”. Location, workplace and
-			seniority narrow it down. You'll see about 8 results per page.</p>
+	<div th:if="${searchEnabled and form.isEmpty()}" class="empty narrow-card">
+		<p class="empty-title">Start with a few keywords, or just filters</p>
+		<p class="empty-text">A job title or a skill works best, like “junior java developer”. You can also leave the
+			keywords empty and browse by filters only, newest first. You'll see about 8 results per page.</p>
 		<p>Found a job somewhere else? <a th:href="@{/applications/new}">Add it by hand</a></p>
 	</div>
 
@@ -80,9 +252,11 @@
 		<th:block th:if="${page.results().isEmpty() and links.pageNumber() == 1}">
 			<h2 id="results-heading">No matches</h2>
 			<div class="empty narrow-card">
-				<p class="empty-title">HiringCafe found nothing for “<span th:text="${keywords}">cobol</span>”<span
-					th:if="${location}" th:text="' near ' + ${location}"> near Riga</span></p>
-				<p class="empty-text">Try fewer or broader words, or set Workplace and Seniority back to Any.</p>
+				<p class="empty-title" th:if="${form.keywords != null and !form.keywords.isBlank()}">HiringCafe found nothing
+					for “<span th:text="${form.keywords}">cobol</span>” with these filters</p>
+				<p class="empty-title" th:unless="${form.keywords != null and !form.keywords.isBlank()}">HiringCafe found
+					nothing with these filters</p>
+				<p class="empty-text">Try fewer or broader words, or untick some filters.</p>
 				<a class="button" th:href="@{/applications/new}">Add a job by hand</a>
 			</div>
 		</th:block>
@@ -92,8 +266,18 @@
 			<h2 th:if="${links.pageNumber() > 1}" id="results-heading" tabindex="-1">Page
 				<span th:text="${links.pageNumber()}">2</span>: <span th:text="${page.results().size()}">8</span> of
 				<span th:text="${page.total()}">25</span> matches not shown yet</h2>
+			<ul th:unless="${activeFilters.isEmpty()}" class="chips active-filters" aria-label="Filters in use">
+				<li th:each="f : ${activeFilters}" th:text="${f}">Remote or Hybrid</li>
+			</ul>
 			<p class="hint results-hint">HiringCafe's location filter is broad, so check the place on each result. Each
 				next page leaves out companies you've already seen, so it shows different employers.</p>
+			<form th:action="@{/search/saved}" method="post" class="save-search">
+				<input type="hidden" name="query" th:value="${links.formQuery()}">
+				<label for="save-name" class="visually-hidden">Name for this search</label>
+				<input id="save-name" type="text" name="name" maxlength="60" required
+					th:value="${form.suggestedName()}" placeholder="Remote Java jobs">
+				<button type="submit"><svg th:replace="~{fragments :: icon-plus}"></svg>Save this search</button>
+			</form>
 			<div th:if="${hasSkills}" class="sort-row">
 				<span class="hint">Order on this page:</span>
 				<a th:if="${!byFit}" th:href="@{${links.sorted(null)}}">Best fit first</a>

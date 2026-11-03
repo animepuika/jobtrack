@@ -12,12 +12,10 @@ import java.util.StringJoiner;
 import com.jobtrack.jobsource.JobImportService;
 import com.jobtrack.jobsource.JobImportService.ImportResult;
 import com.jobtrack.jobsource.JobSearchPage;
-import com.jobtrack.jobsource.JobSearchQuery;
-import com.jobtrack.jobsource.JobSearchQuery.Seniority;
-import com.jobtrack.jobsource.JobSearchQuery.Workplace;
 import com.jobtrack.jobsource.JobSearchResult;
 import com.jobtrack.jobsource.JobSource;
 import com.jobtrack.jobsource.JobSourceException;
+import com.jobtrack.jobsource.SavedSearchService;
 import com.jobtrack.matching.FitScorer;
 import com.jobtrack.matching.FitScorer.Fit;
 import com.jobtrack.matching.SkillProfileService;
@@ -28,7 +26,11 @@ import com.jobtrack.user.JobTrackUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -48,42 +50,45 @@ class SearchPageController {
 
 	private final SkillProfileService skills;
 
+	private final SavedSearchService savedSearches;
+
 	SearchPageController(JobSource jobSource, JobImportService imports, TrackingService tracking,
-			SkillProfileService skills) {
+			SkillProfileService skills, SavedSearchService savedSearches) {
 		this.jobSource = jobSource;
 		this.imports = imports;
 		this.tracking = tracking;
 		this.skills = skills;
+		this.savedSearches = savedSearches;
 	}
 
 	@GetMapping("/search")
-	String search(@AuthenticationPrincipal JobTrackUser user, @RequestParam(required = false) String keywords,
-			@RequestParam(required = false) String location, @RequestParam(required = false) Workplace workplace,
-			@RequestParam(required = false) Seniority seniority, @RequestParam(required = false) String sort,
+	String search(@AuthenticationPrincipal JobTrackUser user, @ModelAttribute("form") SearchForm form,
+			BindingResult binding, @RequestParam(required = false) String sort,
 			@RequestParam(required = false) List<String> seen, @RequestParam(required = false) List<Integer> per,
 			Model model) {
 		List<String> userSkills = this.skills.list(user.getId()).stream().map(UserSkill::getName).toList();
 		boolean byFit = !userSkills.isEmpty() && !"provider".equals(sort);
-		Links links = Links.of(keywords, location, workplace, seniority, "provider".equals(sort) ? sort : null,
-				seen, per);
+		Links links = Links.of(form.toQueryString(), "provider".equals(sort) ? sort : null, seen, per);
 		model.addAttribute("links", links);
 		model.addAttribute("nav", "search");
 		model.addAttribute("hasSkills", !userSkills.isEmpty());
 		model.addAttribute("skillSearch", String.join(" ", userSkills.stream().limit(2).toList()));
 		model.addAttribute("byFit", byFit);
-		model.addAttribute("keywords", keywords);
-		model.addAttribute("location", location);
-		model.addAttribute("workplace", workplace);
-		model.addAttribute("seniority", seniority);
-		model.addAttribute("workplaces", Workplace.values());
-		model.addAttribute("seniorities", Seniority.values());
+		model.addAttribute("options", SearchOptions.INSTANCE);
+		model.addAttribute("savedSearches", this.savedSearches.list(user.getId()));
 		model.addAttribute("searchEnabled", this.jobSource.isEnabled());
-		if (keywords == null || keywords.isBlank() || !this.jobSource.isEnabled()) {
+		if (binding.hasErrors()) {
+			model.addAttribute("searchError", "Some filters weren't understood: "
+					+ String.join(", ", binding.getFieldErrors().stream().map(FieldError::getField).toList())
+					+ ". Check them and search again.");
 			return "search";
 		}
+		if (form.isEmpty() || !this.jobSource.isEnabled()) {
+			return "search";
+		}
+		model.addAttribute("activeFilters", form.describe());
 		try {
-			JobSearchPage page = this.jobSource
-				.search(new JobSearchQuery(keywords, location, workplace, seniority, links.seen()));
+			JobSearchPage page = this.jobSource.search(form.toQuery(links.seen()));
 			List<String> newCompanies = page.results()
 				.stream()
 				.map(JobSearchResult::company)
@@ -123,6 +128,28 @@ class SearchPageController {
 		return "search";
 	}
 
+	@PostMapping("/search/saved")
+	String saveSearch(@AuthenticationPrincipal JobTrackUser user, @RequestParam String name,
+			@RequestParam String query, RedirectAttributes redirect) {
+		try {
+			boolean replaced = this.savedSearches.save(user.getId(), name, query);
+			redirect.addFlashAttribute("success", replaced ? "Updated the saved search “" + name.strip() + "”."
+					: "Saved as “" + name.strip() + "”. Run it any time from the top of this page.");
+		}
+		catch (IllegalArgumentException ex) {
+			redirect.addFlashAttribute("error", ex.getMessage());
+		}
+		return SavedSearchService.isSafeQuery(query) ? "redirect:/search?" + query : "redirect:/search";
+	}
+
+	@PostMapping("/search/saved/{id}/delete")
+	String deleteSearch(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id,
+			RedirectAttributes redirect) {
+		this.savedSearches.delete(user.getId(), id);
+		redirect.addFlashAttribute("success", "Saved search removed.");
+		return "redirect:/search";
+	}
+
 	@PostMapping("/search/track")
 	String track(@AuthenticationPrincipal JobTrackUser user, @RequestParam String externalId,
 			@RequestParam String title, @RequestParam String company,
@@ -147,23 +174,21 @@ class SearchPageController {
 	 * how many companies each earlier page added ({@code per}). That lets Previous drop
 	 * exactly the last page's companies.
 	 */
-	record Links(String keywords, String location, Workplace workplace, Seniority seniority, String sort,
-			List<String> seen, List<Integer> per) {
+	record Links(String formQuery, String sort, List<String> seen, List<Integer> per) {
 
 		/**
 		 * Every page adds its companies to the address, so stop before it gets too long.
 		 */
 		static final int MAX_PAGES = 15;
 
-		static Links of(String keywords, String location, Workplace workplace, Seniority seniority, String sort,
-				List<String> seen, List<Integer> per) {
+		static Links of(String formQuery, String sort, List<String> seen, List<Integer> per) {
 			List<String> companies = (seen != null) ? seen : List.of();
 			List<Integer> counts = (per != null) ? per : List.of();
 			boolean consistent = counts.size() < MAX_PAGES
 					&& counts.stream().allMatch((count) -> count != null && count > 0)
 					&& counts.stream().mapToInt(Integer::intValue).sum() == companies.size();
-			return consistent ? new Links(keywords, location, workplace, seniority, sort, companies, counts)
-					: new Links(keywords, location, workplace, seniority, sort, List.of(), List.of());
+			return consistent ? new Links(formQuery, sort, companies, counts)
+					: new Links(formQuery, sort, List.of(), List.of());
 		}
 
 		public int pageNumber() {
@@ -193,10 +218,9 @@ class SearchPageController {
 
 		private String build(String newSort, List<String> companies, List<Integer> counts) {
 			StringJoiner query = new StringJoiner("&", "/search?", "");
-			add(query, "keywords", this.keywords);
-			add(query, "location", this.location);
-			add(query, "workplace", this.workplace);
-			add(query, "seniority", this.seniority);
+			if (!this.formQuery.isEmpty()) {
+				query.add(this.formQuery);
+			}
 			add(query, "sort", newSort);
 			companies.forEach((company) -> add(query, "seen", company));
 			counts.forEach((count) -> add(query, "per", count));
