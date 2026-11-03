@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Board')}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main id="main" class="wide">
+	<div th:replace="~{fragments :: flash}"></div>
+	<h1>Board</h1>
+	<p class="lead" th:text="'Every open application by stage, the longest-waiting first. Move one on with its buttons; the change is dated today. A flag means no news for ' + ${followUpDays} + ' days or more.'">
+		Every open application by stage.</p>
+
+	<div class="board">
+		<section th:each="entry : ${board.columns()}" class="board-column"
+			th:attr="aria-labelledby='col-' + ${#strings.toLowerCase(entry.key.name())}">
+			<h2 th:id="'col-' + ${#strings.toLowerCase(entry.key.name())}">
+				<span th:replace="~{fragments :: stage(${entry.key})}"></span>
+				<span class="column-count" th:text="${entry.value.size()}">3</span>
+			</h2>
+			<p th:if="${entry.value.isEmpty()}" class="hint column-empty">Nothing here.</p>
+			<ul class="board-cards">
+				<li th:each="card : ${entry.value}" class="board-card" th:classappend="${card.needsFollowUp()} ? 'needs-follow-up'"
+					th:with="app=${card.application()}">
+					<a class="card-title" th:href="@{/applications/{id}(id=${app.id})}" th:text="${app.job.title}">Junior Java Developer</a>
+					<span class="subtitle" th:text="${app.job.company}">Example Logistics</span>
+					<span class="hint" th:text="${card.daysInStage() == 0} ? 'Since today' : (${card.daysInStage() == 1} ? 'For 1 day' : 'For ' + ${card.daysInStage()} + ' days')">For 9 days</span>
+					<span th:if="${card.needsFollowUp()}" class="follow-flag"><svg th:replace="~{fragments :: icon-clock}"></svg>Time to follow up</span>
+					<div class="card-moves">
+						<form th:each="next : ${app.stage.nextStages()}" th:action="@{/applications/{id}/stage(id=${app.id})}" method="post">
+							<input type="hidden" name="stage" th:value="${next}">
+							<input type="hidden" name="returnTo" value="/board">
+							<button type="submit" th:classappend="${next.isFinal() and next.name() != 'ACCEPTED'} ? 'subtle'"
+								th:attr="aria-label='Move ' + ${app.job.title} + ' to ' + ${next.label}">
+								<th:block th:unless="${next.isFinal() and next.name() != 'ACCEPTED'}"><svg th:replace="~{fragments :: icon-arrow}"></svg></th:block><span th:text="${next.label}">Interview</span>
+							</button>
+						</form>
+					</div>
+				</li>
+			</ul>
+		</section>
+
+		<section class="board-column finished" aria-labelledby="col-finished">
+			<h2 id="col-finished">Finished <span class="column-count" th:text="${board.closedTotal()}">4</span></h2>
+			<p th:if="${board.closed().isEmpty()}" class="hint column-empty">Accepted, rejected and withdrawn applications
+				show up here.</p>
+			<ul class="board-cards">
+				<li th:each="card : ${board.closed()}" class="board-card" th:with="app=${card.application()}">
+					<a class="card-title" th:href="@{/applications/{id}(id=${app.id})}" th:text="${app.job.title}">Data Intern</a>
+					<span class="subtitle" th:text="${app.job.company}">Sample Health</span>
+					<span th:replace="~{fragments :: stage(${app.stage})}"></span>
+				</li>
+			</ul>
+			<p th:if="${board.closedTotal() > board.closed().size()}" class="hint">
+				Showing the latest <span th:text="${board.closed().size()}">12</span>. The rest are on the
+				<a th:href="@{/}">dashboard</a>.</p>
+		</section>
+	</div>
+</main>
+</body>
+</html>

@@ -137,7 +137,7 @@
 						<div class="field">
 							<label for="distance">Distance from the location</label>
 							<select id="distance" name="distance">
-								<option value="">About 80 km (default)</option>
+								<option value="">About 80 km</option>
 								<option th:each="k : ${options.distancesKm()}" th:value="${k}" th:selected="${form.distance == k}"
 									th:text="'Within ' + ${k} + ' km'">Within 25 km</option>
 							</select>

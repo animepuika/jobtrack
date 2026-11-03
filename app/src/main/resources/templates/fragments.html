@@ -23,6 +23,8 @@
 		<nav sec:authorize="isAuthenticated()" class="site-nav" aria-label="Main">
 			<a th:href="@{/}" th:attr="aria-current=${nav == 'dashboard'} ? 'page'">Dashboard</a>
 			<a th:href="@{/applications/new}" th:attr="aria-current=${nav == 'add'} ? 'page'">Add job</a>
+			<a th:href="@{/board}" th:attr="aria-current=${nav == 'board'} ? 'page'">Board</a>
+			<a th:href="@{/progress}" th:attr="aria-current=${nav == 'progress'} ? 'page'">Progress</a>
 			<a th:href="@{/search}" th:attr="aria-current=${nav == 'search'} ? 'page'">Search jobs</a>
 		</nav>
 		<form sec:authorize="isAuthenticated()" th:action="@{/logout}" method="post" class="account">
@@ -80,6 +82,21 @@
 <svg th:fragment="icon-archive" class="icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="4" rx="1"/><path d="M4.5 8v8h11V8M8 11.5h4"/></svg>
 <svg th:fragment="icon-note" class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3h10v14H5zM8 7h4M8 10h4M8 13h2"/></svg>
 <svg th:fragment="icon-lock" class="icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="9" width="10" height="8" rx="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg>
+
+<!--/* An application with no news for a while, and a button that logs a follow-up as a note. */-->
+<li th:fragment="follow-up(f, returnTo)" class="follow-up" th:with="app=${f.application()}">
+	<div class="follow-up-job">
+		<a th:href="@{/applications/{id}(id=${app.id})}" th:text="${app.job.title}">Junior Java Developer</a>
+		<span class="subtitle" th:text="${app.job.company}">Example Logistics</span>
+	</div>
+	<span th:replace="~{fragments :: stage(${app.stage})}"></span>
+	<span class="quiet" th:text="'No news for ' + ${f.daysQuiet()} + ' days'">No news for 21 days</span>
+	<form th:action="@{/applications/{id}/notes(id=${app.id})}" method="post">
+		<input type="hidden" name="text" value="Followed up">
+		<input type="hidden" name="returnTo" th:value="${returnTo}">
+		<button type="submit"><svg th:replace="~{fragments :: icon-check}"></svg>I followed up today</button>
+	</form>
+</li>
 
 </body>
 </html>

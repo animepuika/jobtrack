@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import com.jobtrack.documents.CvService;
 import com.jobtrack.documents.CvVersion;
@@ -43,6 +44,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 @RequestMapping("/applications")
 class ApplicationPageController {
+
+	private static final Set<String> OVERVIEW_PAGES = Set.of("/", "/board", "/progress");
 
 	private final TrackingService tracking;
 
@@ -143,10 +146,13 @@ class ApplicationPageController {
 	@PostMapping("/{id}/stage")
 	String changeStage(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id, @RequestParam Stage stage,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-			RedirectAttributes redirect) {
+			@RequestParam(required = false) String returnTo, RedirectAttributes redirect) {
+		boolean elsewhere = isOverviewPage(returnTo);
 		try {
-			this.tracking.changeStage(user.getId(), id, stage, date);
-			redirect.addFlashAttribute("success", "Moved to " + stage.getLabel() + ". The change is in the history below.");
+			JobApplication application = this.tracking.changeStage(user.getId(), id, stage, date);
+			redirect.addFlashAttribute("success",
+					elsewhere ? "Moved “" + application.getJob().getTitle() + "” to " + stage.getLabel() + "."
+							: "Moved to " + stage.getLabel() + ". The change is in the history below.");
 		}
 		catch (StageChangeNotAllowedException ex) {
 			redirect.addFlashAttribute("error", "That move isn't possible: this application is already at "
@@ -155,21 +161,32 @@ class ApplicationPageController {
 		catch (IllegalArgumentException ex) {
 			redirect.addFlashAttribute("error", ex.getMessage());
 		}
-		return "redirect:/applications/" + id;
+		return "redirect:" + (elsewhere ? returnTo : "/applications/" + id);
 	}
 
 	@PostMapping("/{id}/notes")
 	String addNote(@AuthenticationPrincipal JobTrackUser user, @PathVariable long id, @RequestParam String text,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-			RedirectAttributes redirect) {
+			@RequestParam(required = false) String returnTo, RedirectAttributes redirect) {
+		boolean elsewhere = isOverviewPage(returnTo);
 		try {
-			this.tracking.addNote(user.getId(), id, text, date);
-			redirect.addFlashAttribute("success", "Note added.");
+			JobApplication application = this.tracking.addNote(user.getId(), id, text, date);
+			redirect.addFlashAttribute("success", elsewhere
+					? "Noted on “" + application.getJob().getTitle() + "”. The follow-up clock starts again."
+					: "Note added.");
 		}
 		catch (IllegalArgumentException ex) {
 			redirect.addFlashAttribute("error", ex.getMessage());
 		}
-		return "redirect:/applications/" + id;
+		return "redirect:" + (elsewhere ? returnTo : "/applications/" + id);
+	}
+
+	/**
+	 * The overview pages a stage move or note can come from. Only these are redirected
+	 * to, so the parameter can't send anyone to another site.
+	 */
+	private static boolean isOverviewPage(String returnTo) {
+		return returnTo != null && OVERVIEW_PAGES.contains(returnTo);
 	}
 
 	@GetMapping("/{id}/edit")

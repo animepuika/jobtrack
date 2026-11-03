@@ -80,4 +80,14 @@ interface JobApplicationRepository extends JpaRepository<JobApplication, Long> {
 			""")
 	List<HistoryEntry> findRecentActivity(Long ownerId, Pageable page);
 
+	/**
+	 * Every application of the user with its job and history, for the progress page and
+	 * the board. A personal tracker holds hundreds of these at most.
+	 */
+	@Query("""
+			select distinct a from JobApplication a join fetch a.job j left join fetch a.history
+			where j.ownerId = :ownerId
+			""")
+	List<JobApplication> findAllWithHistory(Long ownerId);
+
 }

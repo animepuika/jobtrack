@@ -158,6 +158,15 @@
 			</section>
 
 			<aside class="side-column">
+				<section th:unless="${followUps.isEmpty()}" class="card follow-up-card" aria-labelledby="follow-heading">
+					<h2 id="follow-heading">Time to follow up</h2>
+					<p class="hint" th:text="'No news for ' + ${followUpDays} + ' days or more.'">No news for 14 days or more.</p>
+					<ul class="follow-up-list compact">
+						<th:block th:each="f : ${followUps}"><li th:replace="~{fragments :: follow-up(${f}, '/')}"></li></th:block>
+					</ul>
+					<p th:if="${followUpTotal > followUps.size()}" class="hint">
+						<a th:href="@{/progress#follow-ups}" th:text="'See all ' + ${followUpTotal}">See all 6</a></p>
+				</section>
 				<section class="card" aria-labelledby="upcoming-heading">
 					<h2 id="upcoming-heading">Coming up</h2>
 					<p th:if="${remindersUnavailable}" class="flash warn" role="status">

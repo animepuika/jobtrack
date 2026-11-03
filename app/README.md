@@ -66,9 +66,10 @@ Uploaded CVs then live in the `jobtrack-documents` volume.
 ./mvnw test
 ```
 
-136 tests: business rules, URL handling, the HiringCafe adapter against a local fake
-server, the page states (welcome, paging, errors, final stages), CV upload checks
-and private downloads, CV reading and skill matching, the reminder outbox under
+164 tests: business rules, URL handling, the HiringCafe adapter against a local fake
+server, search filters, paging and saved searches, the page states (welcome, paging,
+errors, final stages), CV upload checks and private downloads, CV reading and skill
+matching, progress figures and follow-ups with a fixed clock, the reminder outbox under
 failures, the export, and integration tests that run the whole app against a real PostgreSQL
 started by Testcontainers. No test calls the real HiringCafe.
 
@@ -118,13 +119,15 @@ Flyway creates the schema from
 | `reminder_ref` | Which reminders exist, whose they are, their latest event version and whether they are open. The reminders themselves are in the reminder service's database |
 | `outbox_event` | Events waiting to be sent to the queue, or already sent |
 | `skill_profile`, `user_skill` | The user's skills and which CV they were read from; never the CV text |
+| `saved_search` | Named searches: the search page's address parameters |
 
 Migrations: [V1](src/main/resources/db/migration/V1__create_tracker_tables.sql) creates
 the tracker, [V2](src/main/resources/db/migration/V2__add_cv_versions_reminders_archive_date.sql)
 adds CVs, reminders, the archive date, and the CV used per application, and
 [V3](src/main/resources/db/migration/V3__move_reminders_to_reminder_service.sql)
 hands existing reminders to the reminder service through the outbox;
-[V4](src/main/resources/db/migration/V4__add_skill_profile.sql) adds the skill profile.
+[V4](src/main/resources/db/migration/V4__add_skill_profile.sql) adds the skill profile;
+[V5](src/main/resources/db/migration/V5__add_saved_searches.sql) adds saved searches.
 
 ### CV files
 
@@ -150,6 +153,35 @@ on HiringCafe's requirements summary for that job. Results can be sorted by fit.
 There is no AI model: the matching is plain text rules, so every result can be
 explained. "Java" does not match "JavaScript", and words like "spring" or "rest" only
 count in a technical phrase.
+
+### Progress, follow-ups and the board
+
+- **Progress** (`/progress`) works everything out from the application histories: how
+  many jobs reached each stage, applications and replies per week for the last 8
+  weeks (with a table view), how many applications got an answer and how long that
+  took on average.
+- **Follow-ups**: an open application (Applied, Interview or Offer) with no stage
+  change or note for 14 days is listed on the dashboard and the progress page. "I
+  followed up today" adds a note, which starts the 14 days again.
+- **Board** (`/board`): one column per open stage, the longest-waiting first, with
+  buttons to move each application on. Moves go through the same stage rules.
+
+### Search filters and saved searches
+
+The search form offers most of HiringCafe's `search_jobs` filters: several
+workplaces and seniorities at once, posting age, employment type, people management,
+years of experience, minimum pay (HiringCafe compares in US dollars), field,
+distance, languages, company country, size, type and industries, hidden companies,
+perks, no degree, quick applications and jobs per company. Keywords are optional
+once a filter is set.
+
+A search is a plain address (`/search?keywords=java&workplace=REMOTE&posted=7`), so
+it can be bookmarked or saved under a name and run again from the top of the page.
+
+`search_jobs` has no page or offset input, so **Next** repeats the search with
+`exclude_company_names` set to the companies already shown. The page links carry
+those names and how many each page added, which lets **Previous** drop exactly the
+last page. HiringCafe returns structured cards for about 8 jobs per request.
 
 ### Reminders
 

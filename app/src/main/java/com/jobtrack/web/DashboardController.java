@@ -13,6 +13,8 @@ import com.jobtrack.reminders.ReminderView;
 import com.jobtrack.reminders.RemindersUnavailableException;
 import com.jobtrack.tracking.ApplicationFilter;
 import com.jobtrack.tracking.JobApplication;
+import com.jobtrack.tracking.ProgressService;
+import com.jobtrack.tracking.ProgressService.FollowUp;
 import com.jobtrack.tracking.Stage;
 import com.jobtrack.tracking.TrackingService;
 import com.jobtrack.user.JobTrackUser;
@@ -34,7 +36,11 @@ class DashboardController {
 
 	private static final int UPCOMING_REMINDERS = 6;
 
+	private static final int FOLLOW_UPS = 4;
+
 	private final TrackingService tracking;
+
+	private final ProgressService progress;
 
 	private final JobSource jobSource;
 
@@ -44,9 +50,10 @@ class DashboardController {
 
 	private final Clock clock;
 
-	DashboardController(TrackingService tracking, JobSource jobSource, ReminderReader reminders,
-			ReminderCommands reminderCommands, Clock clock) {
+	DashboardController(TrackingService tracking, ProgressService progress, JobSource jobSource,
+			ReminderReader reminders, ReminderCommands reminderCommands, Clock clock) {
 		this.tracking = tracking;
+		this.progress = progress;
 		this.jobSource = jobSource;
 		this.reminders = reminders;
 		this.reminderCommands = reminderCommands;
@@ -78,6 +85,10 @@ class DashboardController {
 		model.addAttribute("counts", counts);
 		model.addAttribute("openTotal", counts.values().stream().mapToLong(Long::longValue).sum());
 		model.addAttribute("recent", this.tracking.recentActivity(user.getId(), RECENT_ACTIVITY));
+		List<FollowUp> followUps = this.progress.followUps(user.getId());
+		model.addAttribute("followUps", followUps.stream().limit(FOLLOW_UPS).toList());
+		model.addAttribute("followUpTotal", followUps.size());
+		model.addAttribute("followUpDays", ProgressService.FOLLOW_UP_DAYS);
 		model.addAttribute("stages", Stage.values());
 		model.addAttribute("selectedStage", stage);
 		model.addAttribute("q", text);

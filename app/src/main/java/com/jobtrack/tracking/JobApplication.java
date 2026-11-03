@@ -137,6 +137,24 @@ public class JobApplication {
 			.orElse(LocalDate.MIN);
 	}
 
+	/**
+	 * The day the application entered its current stage.
+	 */
+	public LocalDate getStageSince() {
+		return latestStageDate();
+	}
+
+	/**
+	 * The latest day anything happened: a stage change or a note, such as a follow-up
+	 * email.
+	 */
+	public LocalDate getLastActivityOn() {
+		return this.history.stream()
+			.map(HistoryEntry::getOccurredOn)
+			.max(LocalDate::compareTo)
+			.orElse(LocalDate.MIN);
+	}
+
 	public Long getId() {
 		return id;
 	}

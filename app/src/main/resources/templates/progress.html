@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Progress')}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main id="main">
+	<div th:replace="~{fragments :: flash}"></div>
+	<h1>Your progress</h1>
+	<p class="lead">Worked out from the history of every application, archived ones included. Dates are the ones you
+		entered for each stage change.</p>
+
+	<div th:if="${progress.total() == 0}" class="empty narrow-card">
+		<p class="empty-title">Nothing to measure yet</p>
+		<p class="empty-text">Track a job and move it to Applied when you send the application. This page then shows how
+			your search is going.</p>
+		<a class="button primary" th:href="@{/search}"><svg th:replace="~{fragments :: icon-search}"></svg>Search jobs</a>
+	</div>
+
+	<th:block th:unless="${progress.total() == 0}">
+		<ul class="stat-tiles" aria-label="Summary">
+			<li>
+				<span class="stat-label">Applied</span>
+				<span class="stat-value" th:text="${progress.applied()}">12</span>
+				<span class="hint" th:text="'of ' + ${progress.total()} + ' tracked jobs'">of 20 tracked jobs</span>
+			</li>
+			<li>
+				<span class="stat-label">Applied this week</span>
+				<span class="stat-value" th:text="${progress.appliedThisWeek()}">3</span>
+				<span class="hint">since Monday</span>
+			</li>
+			<li>
+				<span class="stat-label">Heard back</span>
+				<span class="stat-value" th:text="${progress.responsePercent() != null} ? ${progress.responsePercent()} + '%' : '–'">25%</span>
+				<span class="hint" th:text="${progress.heardBack()} + ' of ' + ${progress.applied()} + ' applications: interview or rejection'">3 of 12</span>
+			</li>
+			<li>
+				<span class="stat-label">Average wait for a reply</span>
+				<span class="stat-value" th:text="${progress.averageDaysToReply() != null} ? ${#numbers.formatDecimal(progress.averageDaysToReply(), 1, 0)} + ' days' : '–'">9 days</span>
+				<span class="hint">from applying to the first answer</span>
+			</li>
+			<li>
+				<span class="stat-label">Waiting for a follow-up</span>
+				<span class="stat-value" th:text="${progress.followUpCount()}">2</span>
+				<a th:if="${progress.followUpCount() > 0}" class="hint" href="#follow-ups">See which ones</a>
+				<span th:unless="${progress.followUpCount() > 0}" class="hint">all caught up</span>
+			</li>
+		</ul>
+
+		<div class="columns progress-columns">
+			<section class="card" aria-labelledby="funnel-heading">
+				<h2 id="funnel-heading">How far applications get</h2>
+				<p class="hint">How many tracked jobs reached each stage at some point. The percentage on the right is the
+					share of the step before.</p>
+				<ol class="funnel">
+					<li th:each="step : ${progress.funnel()}"
+						th:title="${step.reached()} + ' reached ' + ${step.stage().label}">
+						<span th:replace="~{fragments :: stage(${step.stage()})}"></span>
+						<span class="funnel-track"><span class="funnel-bar"
+							th:style="'width: ' + ${step.percentOfTotal() ?: 0} + '%'"></span></span>
+						<span class="funnel-count" th:text="${step.reached()}">12</span>
+						<span class="funnel-rate hint" th:text="${step.percentOfPrevious() != null} ? ${step.percentOfPrevious()} + '%' : ''">60%</span>
+					</li>
+				</ol>
+			</section>
+
+			<section class="card" aria-labelledby="outcomes-heading">
+				<h2 id="outcomes-heading">Where things stand</h2>
+				<dl class="outcomes">
+					<div>
+						<dt>Still open</dt>
+						<dd th:text="${progress.open()}">8</dd>
+					</div>
+					<div th:each="s : ${outcomeStages}">
+						<dt><span th:replace="~{fragments :: stage(${s})}"></span></dt>
+						<dd th:text="${progress.outcomes().get(s)}">1</dd>
+					</div>
+				</dl>
+				<p class="hint"><a th:href="@{/board}">Open the board</a> to see every open application by stage.</p>
+			</section>
+		</div>
+
+		<section class="card" aria-labelledby="weeks-heading">
+			<h2 id="weeks-heading">The last 8 weeks</h2>
+			<ul class="chart-legend" aria-label="Legend">
+				<li><span class="swatch applied" aria-hidden="true"></span>Applied</li>
+				<li><span class="swatch heard" aria-hidden="true"></span>Heard back</li>
+			</ul>
+			<ol class="week-chart" aria-describedby="weeks-table-note">
+				<li th:each="w, it : ${progress.weeks()}"
+					th:attr="aria-label='Week of ' + ${#temporals.format(w.weekStart(), 'd MMM')} + ': ' + ${w.applied()} + ' applied, ' + ${w.heardBack()} + ' heard back'">
+					<div class="week-bars" aria-hidden="true">
+						<span class="week-bar applied" th:style="'height: ' + ${progress.barPercent(w.applied())} + '%'"
+							th:title="${w.applied()} + ' applied'"><span class="bar-value" th:if="${w.applied() > 0}" th:text="${w.applied()}">3</span></span>
+						<span class="week-bar heard" th:style="'height: ' + ${progress.barPercent(w.heardBack())} + '%'"
+							th:title="${w.heardBack()} + ' heard back'"><span class="bar-value" th:if="${w.heardBack() > 0}" th:text="${w.heardBack()}">1</span></span>
+					</div>
+					<span class="week-label" th:text="${it.last} ? 'This week' : ${#temporals.format(w.weekStart(), 'd MMM')}">26 Oct</span>
+				</li>
+			</ol>
+			<details id="weeks-table-note">
+				<summary>Show as a table</summary>
+				<table class="weeks-table">
+					<thead><tr><th scope="col">Week starting</th><th scope="col">Applied</th><th scope="col">Heard back</th></tr></thead>
+					<tbody>
+						<tr th:each="w : ${progress.weeks()}">
+							<td th:text="${#temporals.format(w.weekStart(), 'EEE d MMM')}">Mon 26 Oct</td>
+							<td th:text="${w.applied()}">3</td>
+							<td th:text="${w.heardBack()}">1</td>
+						</tr>
+					</tbody>
+				</table>
+			</details>
+		</section>
+
+		<section class="card" id="follow-ups" aria-labelledby="follow-heading">
+			<h2 id="follow-heading">Time to follow up</h2>
+			<p class="hint" th:text="'Open applications with no news for ' + ${followUpDays} + ' days or more. Logging a follow-up adds a note and starts the clock again.'">
+				Open applications with no news for 14 days or more.</p>
+			<p th:if="${followUps.isEmpty()}" class="empty-text">Nothing is waiting on you. Nice.</p>
+			<ul th:unless="${followUps.isEmpty()}" class="follow-up-list">
+				<th:block th:each="f : ${followUps}"><li th:replace="~{fragments :: follow-up(${f}, '/progress')}"></li></th:block>
+			</ul>
+		</section>
+	</th:block>
+</main>
+</body>
+</html>
