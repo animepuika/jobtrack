@@ -1,6 +1,14 @@
 package com.jobtrack.jobsource;
 
-public record JobSearchQuery(String keywords, String location, Workplace workplace, Seniority seniority) {
+import java.util.List;
+
+/**
+ * A job search. {@code excludedCompanies} leaves out jobs from those companies:
+ * HiringCafe has no page number, so the next page is the same search without the
+ * companies already shown.
+ */
+public record JobSearchQuery(String keywords, String location, Workplace workplace, Seniority seniority,
+		List<String> excludedCompanies) {
 
 	public JobSearchQuery {
 		if (keywords == null || keywords.isBlank()) {
@@ -8,6 +16,16 @@ public record JobSearchQuery(String keywords, String location, Workplace workpla
 		}
 		keywords = keywords.strip();
 		location = (location == null || location.isBlank()) ? null : location.strip();
+		excludedCompanies = (excludedCompanies == null) ? List.of()
+				: excludedCompanies.stream()
+					.filter((company) -> company != null && !company.isBlank())
+					.map(String::strip)
+					.distinct()
+					.toList();
+	}
+
+	public JobSearchQuery(String keywords, String location, Workplace workplace, Seniority seniority) {
+		this(keywords, location, workplace, seniority, List.of());
 	}
 
 	public enum Workplace {

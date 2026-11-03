@@ -85,6 +85,9 @@ class HiringCafeJobSource implements JobSource {
 		if (query.seniority() != null) {
 			arguments.put("seniority_levels", List.of(query.seniority().label()));
 		}
+		if (!query.excludedCompanies().isEmpty()) {
+			arguments.put("exclude_company_names", query.excludedCompanies());
+		}
 		arguments.put("limit", this.properties.maxResults());
 		ToolResult result = callTool("search_jobs", arguments);
 		JobCards cards = (result.meta() != null) ? result.meta().get(JOB_CARDS) : null;

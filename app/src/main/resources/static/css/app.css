@@ -433,3 +433,4 @@ details.reschedule form { margin-top: 8px; }
 .skill-list li { display: inline-flex; align-items: center; gap: 6px; padding: 0 4px 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); background: var(--surface); font-weight: 500; }
 .skill-list button.remove { min-height: 36px; min-width: 36px; padding: 0; border: 0; background: transparent; color: var(--ink-3); font-size: 1.2rem; }
 .skill-list button.remove:hover { color: var(--danger); }
+.pager .summary .first-page { margin-left: 12px; font-size: var(--text-sm); }

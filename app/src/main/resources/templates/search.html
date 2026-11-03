@@ -50,7 +50,7 @@
 	<div th:if="${searchEnabled and (keywords == null or keywords.isBlank())}" class="empty narrow-card">
 		<p class="empty-title">Start with a few keywords</p>
 		<p class="empty-text">A job title or a skill works best, like “junior java developer”. Location, workplace and
-			seniority narrow it down. You'll see up to 10 results at a time.</p>
+			seniority narrow it down. You'll see about 8 results per page.</p>
 		<p>Found a job somewhere else? <a th:href="@{/applications/new}">Add it by hand</a></p>
 	</div>
 
@@ -70,7 +70,14 @@
 	</div>
 
 	<section th:if="${page}" aria-labelledby="results-heading">
-		<th:block th:if="${page.results().isEmpty()}">
+		<th:block th:if="${page.results().isEmpty() and links.pageNumber() > 1}">
+			<h2 id="results-heading">No more matches</h2>
+			<div class="empty narrow-card">
+				<p class="empty-text">Every match for this search has been shown on the earlier pages.</p>
+				<a class="button" th:href="@{${links.previous()}}"><svg th:replace="~{fragments :: icon-back}"></svg>Previous page</a>
+			</div>
+		</th:block>
+		<th:block th:if="${page.results().isEmpty() and links.pageNumber() == 1}">
 			<h2 id="results-heading">No matches</h2>
 			<div class="empty narrow-card">
 				<p class="empty-title">HiringCafe found nothing for “<span th:text="${keywords}">cobol</span>”<span
@@ -80,16 +87,19 @@
 			</div>
 		</th:block>
 		<th:block th:unless="${page.results().isEmpty()}">
-			<h2 id="results-heading" tabindex="-1">Showing <span th:text="${page.results().size()}">10</span> of
-				<span th:text="${page.total()}">33</span> matches</h2>
-			<p class="hint results-hint">HiringCafe's location filter is broad, so check the place on each result. Narrow
-				your keywords to see different matches.</p>
+			<h2 th:if="${links.pageNumber() == 1}" id="results-heading" tabindex="-1">Showing
+				<span th:text="${page.results().size()}">8</span> of <span th:text="${page.total()}">33</span> matches</h2>
+			<h2 th:if="${links.pageNumber() > 1}" id="results-heading" tabindex="-1">Page
+				<span th:text="${links.pageNumber()}">2</span>: <span th:text="${page.results().size()}">8</span> of
+				<span th:text="${page.total()}">25</span> matches not shown yet</h2>
+			<p class="hint results-hint">HiringCafe's location filter is broad, so check the place on each result. Each
+				next page leaves out companies you've already seen, so it shows different employers.</p>
 			<div th:if="${hasSkills}" class="sort-row">
-				<span class="hint">Order:</span>
-				<a th:if="${!byFit}" th:href="@{/search(keywords=${keywords},location=${location},workplace=${workplace},seniority=${seniority})}">Best fit first</a>
+				<span class="hint">Order on this page:</span>
+				<a th:if="${!byFit}" th:href="@{${links.sorted(null)}}">Best fit first</a>
 				<strong th:if="${byFit}">Best fit first</strong>
 				<span aria-hidden="true">·</span>
-				<a th:if="${byFit}" th:href="@{/search(keywords=${keywords},location=${location},workplace=${workplace},seniority=${seniority},sort='provider')}">HiringCafe's order</a>
+				<a th:if="${byFit}" th:href="@{${links.sorted('provider')}}">HiringCafe's order</a>
 				<strong th:if="${!byFit}">HiringCafe's order</strong>
 				<span aria-hidden="true">·</span>
 				<a th:href="@{/skills}">Edit your skills</a>
@@ -132,6 +142,20 @@
 					</div>
 				</li>
 			</ul>
+			<nav th:if="${nextPage != null or links.pageNumber() > 1}" class="pager" aria-label="Result pages">
+				<span class="summary">Page <span th:text="${links.pageNumber()}">1</span><a th:if="${links.pageNumber() > 2}"
+					class="first-page" th:href="@{${links.first()}}">Back to page 1</a></span>
+				<ul>
+					<li>
+						<a th:if="${links.pageNumber() > 1}" th:href="@{${links.previous()}}" rel="prev"><svg th:replace="~{fragments :: icon-back}"></svg>Previous</a>
+						<span th:unless="${links.pageNumber() > 1}" aria-disabled="true"><svg th:replace="~{fragments :: icon-back}"></svg>Previous</span>
+					</li>
+					<li>
+						<a th:if="${nextPage}" th:href="@{${nextPage}}" rel="next">Next<svg th:replace="~{fragments :: icon-arrow}"></svg></a>
+						<span th:unless="${nextPage}" aria-disabled="true">Next<svg th:replace="~{fragments :: icon-arrow}"></svg></span>
+					</li>
+				</ul>
+			</nav>
 			<p class="after-results">Not here? <a th:href="@{/applications/new}">Add a job by hand</a></p>
 		</th:block>
 	</section>

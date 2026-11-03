@@ -15,6 +15,7 @@ import com.jobtrack.tracking.SourceProvider;
 import com.jobtrack.user.JobTrackUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -25,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -75,6 +78,54 @@ class SearchPageIntegrationTest {
 			.andExpect(content().string(containsString("Junior Java Developer")))
 			.andExpect(content().string(containsString("Riga, Riga · Hybrid")))
 			.andExpect(content().string(containsString("</svg>Track</button>")));
+	}
+
+	@Test
+	void nextPageLeavesOutTheCompaniesAlreadyShown() throws Exception {
+		JobSearchResult other = new JobSearchResult("fixture00000003", "Graduate Developer", "Sample & Sons", "Riga",
+				List.of("Riga · Onsite"), "https://hiringcafe.com/job/graduate-developer-fixture00000003");
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT, other), 40));
+
+		this.mvc.perform(get("/search").param("keywords", "java").with(user(this.user)))
+			.andExpect(content().string(containsString("of <span>40</span> matches</h2>")))
+			.andExpect(content().string(containsString(
+					"href=\"/search?keywords=java&amp;seen=Example+Logistics&amp;seen=Sample+%26+Sons&amp;per=2\" rel=\"next\"")))
+			.andExpect(content().string(containsString("<span aria-disabled=\"true\">")));
+
+		this.mvc
+			.perform(get("/search").param("keywords", "java")
+				.param("seen", "Example Logistics", "Sample & Sons")
+				.param("per", "2")
+				.with(user(this.user)))
+			.andExpect(content().string(containsString("matches not shown yet")))
+			.andExpect(content().string(containsString("href=\"/search?keywords=java\" rel=\"prev\"")));
+		ArgumentCaptor<JobSearchQuery> queries = ArgumentCaptor.forClass(JobSearchQuery.class);
+		verify(this.jobSource, times(2)).search(queries.capture());
+		assertThat(queries.getAllValues().get(0).excludedCompanies()).isEmpty();
+		assertThat(queries.getAllValues().get(1).excludedCompanies()).containsExactly("Example Logistics",
+				"Sample & Sons");
+	}
+
+	@Test
+	void pagingThatDoesNotAddUpStartsAgainAtPageOne() throws Exception {
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 40));
+
+		this.mvc
+			.perform(get("/search").param("keywords", "java").param("seen", "A", "B").param("per", "5")
+				.with(user(this.user)))
+			.andExpect(content().string(containsString("of <span>40</span> matches</h2>")));
+		ArgumentCaptor<JobSearchQuery> query = ArgumentCaptor.forClass(JobSearchQuery.class);
+		verify(this.jobSource).search(query.capture());
+		assertThat(query.getValue().excludedCompanies()).isEmpty();
+	}
+
+	@Test
+	void lastPageHasNoNextLink() throws Exception {
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 1));
+
+		this.mvc.perform(get("/search").param("keywords", "java").with(user(this.user)))
+			.andExpect(content().string(org.hamcrest.Matchers.not(containsString("rel=\"next\""))))
+			.andExpect(content().string(org.hamcrest.Matchers.not(containsString("class=\"pager\""))));
 	}
 
 	@Test

@@ -84,7 +84,20 @@ class HiringCafeJobSourceTest {
 				.contains("\"search\":\"Java developer\"")
 				.contains("\"location\":\"Latvia\"")
 				.contains("\"workplace_types\":[\"Remote\"]")
-				.doesNotContain("seniority_levels"));
+				.doesNotContain("seniority_levels")
+				.doesNotContain("exclude_company_names"));
+	}
+
+	@Test
+	void leavesOutCompaniesAlreadyShownForTheNextPage() throws IOException {
+		this.responses.add(new StubResponse(200, fixture("search-response.json"), null, 0));
+
+		this.jobSource.search(new JobSearchQuery("Java", null, null, null,
+				List.of("Example Logistics", " Sample & Sons ", "Example Logistics")));
+
+		assertThat(this.requestBodies).singleElement()
+			.satisfies((body) -> assertThat(body)
+				.contains("\"exclude_company_names\":[\"Example Logistics\",\"Sample & Sons\"]"));
 	}
 
 	@Test
