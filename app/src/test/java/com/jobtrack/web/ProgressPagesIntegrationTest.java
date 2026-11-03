@@ -78,7 +78,9 @@ class ProgressPagesIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(content().string(containsString("Junior Java Developer")))
 			.andExpect(content().string(containsString("aria-label=\"Move Junior Java Developer to Applied\"")))
-			.andExpect(content().string(containsString("name=\"returnTo\" value=\"/board\"")));
+			.andExpect(content().string(containsString("name=\"returnTo\" value=\"/board\"")))
+			.andExpect(content().string(containsString("I'm not pursuing it")))
+			.andExpect(content().string(org.hamcrest.Matchers.not(containsString("They said no"))));
 
 		this.mvc
 			.perform(post("/applications/{id}/stage", application.getId()).with(user(this.user))

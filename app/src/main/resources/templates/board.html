@@ -25,14 +25,30 @@
 					<span class="hint" th:text="${card.daysInStage() == 0} ? 'Since today' : (${card.daysInStage() == 1} ? 'For 1 day' : 'For ' + ${card.daysInStage()} + ' days')">For 9 days</span>
 					<span th:if="${card.needsFollowUp()}" class="follow-flag"><svg th:replace="~{fragments :: icon-clock}"></svg>Time to follow up</span>
 					<div class="card-moves">
-						<form th:each="next : ${app.stage.nextStages()}" th:action="@{/applications/{id}/stage(id=${app.id})}" method="post">
+						<!--/* The next step forward is one click. Closing moves can't be undone, so they sit behind a second click. */-->
+						<form th:each="next : ${app.stage.nextStages()}" th:if="${next.name() != 'REJECTED' and next.name() != 'WITHDRAWN'}"
+							th:action="@{/applications/{id}/stage(id=${app.id})}" method="post">
 							<input type="hidden" name="stage" th:value="${next}">
 							<input type="hidden" name="returnTo" value="/board">
-							<button type="submit" th:classappend="${next.isFinal() and next.name() != 'ACCEPTED'} ? 'subtle'"
-								th:attr="aria-label='Move ' + ${app.job.title} + ' to ' + ${next.label}">
-								<th:block th:unless="${next.isFinal() and next.name() != 'ACCEPTED'}"><svg th:replace="~{fragments :: icon-arrow}"></svg></th:block><span th:text="${next.label}">Interview</span>
+							<button type="submit" th:attr="aria-label='Move ' + ${app.job.title} + ' to ' + ${next.label}">
+								<svg th:replace="~{fragments :: icon-arrow}"></svg><span th:text="${next.label}">Interview</span>
 							</button>
 						</form>
+						<details class="close-moves">
+							<summary th:attr="aria-label='Close ' + ${app.job.title}">Close…</summary>
+							<p class="hint">Closing is final: stages only move forward.</p>
+							<form th:if="${app.stage.name() != 'SAVED'}"
+								th:action="@{/applications/{id}/stage(id=${app.id})}" method="post">
+								<input type="hidden" name="stage" value="REJECTED">
+								<input type="hidden" name="returnTo" value="/board">
+								<button type="submit" th:attr="aria-label='Move ' + ${app.job.title} + ' to Rejected'">They said no</button>
+							</form>
+							<form th:action="@{/applications/{id}/stage(id=${app.id})}" method="post">
+								<input type="hidden" name="stage" value="WITHDRAWN">
+								<input type="hidden" name="returnTo" value="/board">
+								<button type="submit" th:attr="aria-label='Move ' + ${app.job.title} + ' to Withdrawn'">I'm not pursuing it</button>
+							</form>
+						</details>
 					</div>
 				</li>
 			</ul>

@@ -533,5 +533,10 @@ main.wide { max-width: max(var(--page-max), 1320px); }
 .follow-flag { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-xs); font-weight: 600; color: var(--warn); }
 .card-moves { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .card-moves button { min-height: 32px; padding: 0 8px; font-size: var(--text-sm); }
-.card-moves button.subtle { padding: 0 6px; }
+.close-moves { flex-basis: 100%; }
+.close-moves > summary { min-height: 32px; padding: 0; font-size: var(--text-sm); color: var(--ink-2); }
+.close-moves[open] { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.close-moves[open] > summary { color: var(--ink); }
+.close-moves .hint { margin: 0; }
+.close-moves button { width: 100%; justify-content: flex-start; }
 .board-column.finished .stage { align-self: flex-start; margin-top: 4px; }
