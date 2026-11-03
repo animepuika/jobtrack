@@ -6,6 +6,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -80,6 +81,37 @@ class HiringCafeJobSourceTest {
 		assertThat(first.summary())
 			.isEqualTo("Fictional summary: Java and Spring Boot with PostgreSQL; Docker is a plus.");
 		assertThat(page.results().get(1).summary()).isEqualTo("Fictional summary: Python and Django.");
+		assertThat(first.postedOn()).isEqualTo(LocalDate.of(2026, 10, 30));
+		assertThat(page.results().get(1).postedOn()).isNull();
+	}
+
+	@Test
+	void readsJobDetailsIntoFactsRequirementsAndPlainParagraphs() throws IOException {
+		this.responses.add(new StubResponse(200, fixture("details-response.json"), null, 0));
+
+		JobDetails details = this.jobSource.details("fixture00000001");
+
+		assertThat(this.requestBodies).singleElement()
+			.satisfies((body) -> assertThat(body).contains("\"name\":\"get_job_details\"")
+				.contains("\"job_id\":\"fixture00000001\""));
+		assertThat(details.title()).isEqualTo("Junior Java Developer");
+		assertThat(details.company()).isEqualTo("Example Logistics");
+		assertThat(details.url()).isEqualTo("https://hiringcafe.com/job/junior-java-developer-fixture00000001");
+		assertThat(details.postedOn()).isEqualTo(LocalDate.of(2026, 10, 30));
+		assertThat(details.facts()).containsKeys("Location", "Compensation", "Years of experience", "Technical tools")
+			.doesNotContainKeys("Job ID", "View & apply")
+			.containsEntry("Technical tools", "Java, Spring Boot, PostgreSQL");
+		assertThat(details.requirementsSummary())
+			.isEqualTo("Fictional summary: Java and Spring Boot with PostgreSQL; Docker is a plus.");
+		assertThat(details.description()).containsExactly("About the team",
+				"We build <b>fictional</b> routing software.\nSecond line of the same paragraph.",
+				"• Paid learning time", "• Remote Fridays");
+	}
+
+	@Test
+	void refusesSomethingThatIsNotAJobIdWithoutCallingHiringCafe() {
+		assertThatExceptionOfType(JobSourceException.class).isThrownBy(() -> this.jobSource.details("../admin"));
+		assertThat(this.requestBodies).isEmpty();
 	}
 
 	@Test

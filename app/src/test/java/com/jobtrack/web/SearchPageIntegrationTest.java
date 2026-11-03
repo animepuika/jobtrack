@@ -1,10 +1,15 @@
 package com.jobtrack.web;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.jobtrack.IntegrationTest;
 import com.jobtrack.TestUsers;
+import com.jobtrack.jobsource.JobDetails;
 import com.jobtrack.jobsource.JobSearchPage;
 import com.jobtrack.jobsource.JobSearchQuery;
 import com.jobtrack.jobsource.JobSearchQuery.Industry;
@@ -66,6 +71,9 @@ class SearchPageIntegrationTest {
 	@Autowired
 	private SavedSearchService savedSearches;
 
+	@Autowired
+	private Clock clock;
+
 	@MockitoBean
 	private JobSource jobSource;
 
@@ -94,7 +102,7 @@ class SearchPageIntegrationTest {
 				.with(user(this.user)))
 			.andExpect(status().isOk())
 			.andExpect(content().string(containsString("<li>Remote or Hybrid</li>")))
-			.andExpect(content().string(containsString("<li>Posted in the last 7 days</li>")))
+			.andExpect(content().string(containsString("<li>Posted: past week</li>")))
 			.andExpect(content().string(containsString("<li>At least $2,500 a month</li>")))
 			.andExpect(content().string(containsString("More filters")))
 			.andExpect(content().string(containsString(
@@ -174,6 +182,97 @@ class SearchPageIntegrationTest {
 			.andExpect(redirectedUrl("/search"))
 			.andExpect(flash().attribute("error", "This search can't be saved: run a search first"));
 		assertThat(this.savedSearches.list(this.user.getId())).isEmpty();
+	}
+
+	@Test
+	void resultsSayHowOldThePostIsAndCanPutTheNewestFirst() throws Exception {
+		LocalDate today = LocalDate.now(this.clock);
+		JobSearchResult older = withPosted(RESULT, today.minusDays(20));
+		JobSearchResult newer = new JobSearchResult("fixture00000004", "Graduate Developer", "Sample & Sons", "Riga",
+				List.of("Riga · Onsite"), "https://hiringcafe.com/job/graduate-developer-fixture00000004",
+				"Fictional summary: Java and SQL.", today.minusDays(2));
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(older, newer), 2));
+
+		String html = this.mvc.perform(get("/search").param("keywords", "java").param("sort", "newest")
+				.with(user(this.user)))
+			.andExpect(content().string(containsString(">2 days ago</time>")))
+			.andExpect(content().string(containsString(">2 weeks ago</time>")))
+			.andExpect(content().string(containsString("<strong aria-current=\"true\">Newest first</strong>")))
+			.andExpect(content().string(containsString("Fictional summary: Java and SQL.")))
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html.indexOf("Graduate Developer")).isLessThan(html.indexOf("Junior Java Developer"));
+	}
+
+	@Test
+	void openingAResultRemembersItAndLaterSearchesMarkIt() throws Exception {
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 1));
+		this.mvc.perform(get("/search").param("keywords", "java").with(user(this.user)))
+			.andExpect(content().string(org.hamcrest.Matchers.not(containsString("Opened today"))));
+
+		this.mvc
+			.perform(get("/search/open").param("id", RESULT.externalId())
+				.param("url", RESULT.url())
+				.with(user(this.user)))
+			.andExpect(redirectedUrl(RESULT.url()));
+
+		this.mvc.perform(get("/search").param("keywords", "java").with(user(this.user)))
+			.andExpect(content().string(containsString("Opened today")))
+			.andExpect(content().string(containsString("class=\"result viewed\"")));
+		this.mvc.perform(get("/search").param("keywords", "java").with(user(this.users.create())))
+			.andExpect(content().string(org.hamcrest.Matchers.not(containsString("Opened today"))));
+	}
+
+	@Test
+	void openOnlyFollowsHiringCafeLinks() throws Exception {
+		this.mvc
+			.perform(get("/search/open").param("id", RESULT.externalId())
+				.param("url", "https://example.com/job/fixture00000001")
+				.with(user(this.user)))
+			.andExpect(status().isBadRequest());
+		this.mvc
+			.perform(get("/search/open").param("id", RESULT.externalId())
+				.param("url", "https://hiringcafe.com.example.com/job")
+				.with(user(this.user)))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void detailsPageShowsEverythingAndCountsAsOpened() throws Exception {
+		given(this.jobSource.details(RESULT.externalId())).willReturn(new JobDetails(RESULT.externalId(),
+				RESULT.title(), RESULT.company(), RESULT.url(), LocalDate.now(this.clock).minusDays(1),
+				new LinkedHashMap<>(Map.of("Compensation", "€2,000 – €2,800/mo")),
+				"Fictional summary: Java and Spring Boot.", List.of("About the team", "• Remote Fridays")));
+
+		this.mvc
+			.perform(get("/search/jobs/{id}", RESULT.externalId()).param("back", "/search?keywords=java")
+				.with(user(this.user)))
+			.andExpect(status().isOk())
+			.andExpect(content().string(containsString("<h1 id=\"job-title\">Junior Java Developer</h1>")))
+			.andExpect(content().string(containsString("€2,000 – €2,800/mo")))
+			.andExpect(content().string(containsString("Fictional summary: Java and Spring Boot.")))
+			.andExpect(content().string(containsString("• Remote Fridays")))
+			.andExpect(content().string(containsString(">yesterday</time>")))
+			.andExpect(content().string(containsString("href=\"/search?keywords=java\"")))
+			.andExpect(content().string(containsString("Track this job")));
+
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 1));
+		this.mvc.perform(get("/search").param("keywords", "java").with(user(this.user)))
+			.andExpect(content().string(containsString("Opened today")));
+	}
+
+	@Test
+	void detailsPageIgnoresABackLinkToAnotherSite() throws Exception {
+		given(this.jobSource.details(RESULT.externalId()))
+			.willThrow(new JobSourceException("HiringCafe could not be reached."));
+
+		this.mvc
+			.perform(get("/search/jobs/{id}", RESULT.externalId()).param("back", "https://example.com/")
+				.with(user(this.user)))
+			.andExpect(content().string(containsString("The details can't be loaded right now")))
+			.andExpect(content().string(containsString("class=\"back-link\" href=\"/search\"")));
 	}
 
 	@Test
@@ -315,6 +414,11 @@ class SearchPageIntegrationTest {
 				.param("url", RESULT.url()))
 			.andExpect(redirectedUrlPattern("/applications/*"))
 			.andExpect(flash().attribute("success", "Saved from HiringCafe. It starts in the Saved stage."));
+	}
+
+	private static JobSearchResult withPosted(JobSearchResult result, LocalDate postedOn) {
+		return new JobSearchResult(result.externalId(), result.title(), result.company(), result.location(),
+				result.highlights(), result.url(), result.summary(), postedOn);
 	}
 
 }

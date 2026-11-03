@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "# [Junior Java Developer](https://hiringcafe.com/job/junior-java-developer-fixture00000001?utm_source=claude&utm_medium=llm-app&utm_campaign=mcp)\n**Example Logistics**\n\n- **Location:** Riga, Latvia\n- **Workplace:** Hybrid\n- **Compensation:** €2,000 – €2,800/mo\n- **Years of experience:** 1\n- **Technical tools:** Java, Spring Boot, PostgreSQL\n- **Posted:** 2026-10-30\n- **Job ID:** fixture00000001\n- **View & apply:** https://hiringcafe.com/job/junior-java-developer-fixture00000001?utm_source=claude&utm_medium=llm-app&utm_campaign=mcp\n\n## Requirements summary\nFictional summary: Java and Spring Boot with PostgreSQL; Docker is a plus.\n\n## Full description\nAbout the team\n\nWe build <b>fictional</b> routing software.\nSecond line of the same paragraph.\n\n•\nPaid learning time\n\n•\nRemote Fridays\n"
+      }
+    ]
+  }
+}

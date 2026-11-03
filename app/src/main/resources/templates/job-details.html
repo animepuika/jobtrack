@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head(${job != null ? job.title() : 'Job details'})}"></head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main id="main" class="narrow-wide">
+	<div th:replace="~{fragments :: flash}"></div>
+	<a class="back-link" th:href="@{${back}}"><svg th:replace="~{fragments :: icon-back}"></svg>Back to results</a>
+
+	<div th:if="${detailsError}" class="flash warn" role="alert">
+		<svg th:replace="~{fragments :: icon-clock}"></svg>
+		<div class="flash-body">
+			<p class="flash-title">The details can't be loaded right now</p>
+			<p th:text="${detailsError}">HiringCafe could not be reached.</p>
+			<p>Try again in a moment, or go back to the results.</p>
+		</div>
+	</div>
+
+	<article th:if="${job}" class="job-details" aria-labelledby="job-title">
+		<header class="job-header">
+			<h1 id="job-title" th:text="${job.title()}">Junior Java Developer</h1>
+			<p class="subtitle job-company" th:text="${job.company()}">Example Logistics</p>
+			<p class="result-meta">
+				<span th:if="${job.postedOn() != null}" class="posted" th:classappend="${@ages.daysSince(job.postedOn()) <= 3} ? 'fresh'">
+					<svg th:replace="~{fragments :: icon-clock}"></svg>
+					<span>Posted <time th:datetime="${job.postedOn()}" th:text="${@ages.ago(job.postedOn())}">3 days ago</time>
+						<span class="hint" th:text="'(' + ${#temporals.format(job.postedOn(), 'd MMMM yyyy')} + ')'">(7 September 2026)</span></span>
+				</span>
+			</p>
+			<div class="actions">
+				<a th:if="${job.url() != null}" class="button primary"
+					th:href="@{/search/open(id=${externalId}, url=${job.url()})}" target="_blank" rel="noopener">Apply on HiringCafe<svg
+					th:replace="~{fragments :: icon-external}"></svg><span class="visually-hidden">(opens in a new tab)</span></a>
+				<a th:if="${trackedId}" class="button tracked" th:href="@{/applications/{id}(id=${trackedId})}"><svg
+					th:replace="~{fragments :: icon-check}"></svg>Tracked · open</a>
+				<form th:unless="${trackedId}" th:action="@{/search/track}" method="post">
+					<input type="hidden" name="externalId" th:value="${externalId}">
+					<input type="hidden" name="title" th:value="${job.title()}">
+					<input type="hidden" name="company" th:value="${job.company() ?: 'Unknown company'}">
+					<input type="hidden" name="location" th:value="${job.facts().get('Location')}">
+					<input type="hidden" name="url" th:value="${job.url()}">
+					<button type="submit"><svg th:replace="~{fragments :: icon-plus}"></svg>Track this job</button>
+				</form>
+			</div>
+		</header>
+
+		<div class="job-columns">
+			<div class="job-main">
+				<section th:if="${job.requirementsSummary() != null}" class="card" aria-labelledby="req-heading">
+					<h2 id="req-heading">What they ask for</h2>
+					<p th:text="${job.requirementsSummary()}">Bachelor's degree; 0–2 years of experience.</p>
+				</section>
+
+				<section th:if="${fit != null}" class="card fit" th:classappend="'fit-' + ${#strings.toLowerCase(fit.level().name())}"
+					aria-labelledby="fit-heading">
+					<h2 id="fit-heading">How you fit</h2>
+					<p class="fit-level"><strong th:text="${fit.level().label}">Strong fit</strong>
+						<span th:if="${fit.isKnown()}" class="hint"
+							th:text="${fit.matched().size()} + ' of ' + ${fit.matched().size() + fit.missing().size()} + ' skills they name'">3 of 4</span></p>
+					<p th:unless="${fit.matched().isEmpty()}" class="fit-skills"><span class="hint">You have:</span>
+						<span th:text="${#strings.listJoin(fit.matched(), ', ')}">Java</span></p>
+					<p th:unless="${fit.missing().isEmpty()}" class="fit-skills"><span class="hint">Missing:</span>
+						<span th:text="${#strings.listJoin(fit.missing(), ', ')}">Kubernetes</span></p>
+					<p class="hint">Compared with <a th:href="@{/skills}">your skills</a>, using the requirements and tools above.</p>
+				</section>
+
+				<section th:unless="${job.description().isEmpty()}" class="card description" aria-labelledby="desc-heading">
+					<h2 id="desc-heading">Full description</h2>
+					<p th:each="paragraph : ${job.description()}" th:text="${paragraph}"
+						th:classappend="${#strings.startsWith(paragraph, '•')} ? 'bullet'">Paragraph</p>
+				</section>
+			</div>
+
+			<aside class="job-facts card" aria-labelledby="facts-heading">
+				<h2 id="facts-heading">At a glance</h2>
+				<dl>
+					<div th:each="fact : ${job.facts()}" th:unless="${fact.key == 'Posted'}">
+						<dt th:text="${fact.key}">Compensation</dt>
+						<dd th:text="${fact.value}">$89,210 – $144,960/yr</dd>
+					</div>
+				</dl>
+				<p class="hint">From HiringCafe, which collects postings from employers' own career sites.</p>
+			</aside>
+		</div>
+	</article>
+</main>
+</body>
+</html>

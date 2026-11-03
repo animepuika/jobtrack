@@ -26,4 +26,21 @@ record SearchOptions(Workplace[] workplaces, Seniority[] seniorities, Employment
 			CompanySize.values(), OrganizationType.values(), Perk.values(), List.of(1, 3, 7, 14, 30),
 			List.of(10, 25, 50, 100, 200));
 
+	/**
+	 * "Today", "Past week" and so on, for the posted filter.
+	 */
+	public String postedLabel(int days) {
+		return postedWithin(days);
+	}
+
+	static String postedWithin(int days) {
+		return switch (days) {
+			case 1 -> "Today";
+			case 7 -> "Past week";
+			case 14 -> "Past 2 weeks";
+			case 30 -> "Past month";
+			default -> "Past " + days + " days";
+		};
+	}
+
 }

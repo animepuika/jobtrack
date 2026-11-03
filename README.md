@@ -87,6 +87,24 @@ and out of container images. CV text is read in memory and never stored; only sk
 names are kept. Live job search is off in the public demo, and no real job listings
 are published, in line with HiringCafe's terms.
 
+## Use of HiringCafe
+
+JobTrack is an independent learning project. It is not affiliated with, endorsed by
+or sponsored by HiringCafe; the name is used only to say which service the search
+connects to.
+
+- JobTrack calls HiringCafe's public, unauthenticated connector endpoint
+  (`https://hiringcafe.com/api/mcp`) only when its user searches or opens a job: one
+  request per search page or details view, no crawling, no background polling, and
+  no retry after a rate-limit answer.
+- Results are shown to the person who searched. Only jobs they choose to track are
+  saved, in their own local database, together with the IDs of jobs they opened.
+  Nothing from HiringCafe is copied into this repository, its tests, its container
+  images or its screenshots; all of those use fictional data.
+- HiringCafe's terms allow use of its material for your own personal use and forbid
+  republishing, selling or redistributing it. Anyone who runs JobTrack is responsible
+  for using it that way: for your own job search, not as a public site or a job feed.
+
 ## Status
 
 | Milestone | Status |

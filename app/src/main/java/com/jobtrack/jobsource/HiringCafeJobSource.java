@@ -3,11 +3,14 @@ package com.jobtrack.jobsource;
 import java.net.http.HttpClient;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -51,6 +54,14 @@ class HiringCafeJobSource implements JobSource {
 
 	private static final Pattern JOB_ID_LINE = Pattern.compile("\\*\\*Job ID:\\*\\*\\s*(\\S+)");
 
+	private static final Pattern POSTED_LINE = Pattern.compile("\\*\\*Posted:\\*\\*\\s*(\\S+)");
+
+	private static final Pattern FACT_LINE = Pattern.compile("-\\s+\\*\\*([^*]+?):\\*\\*\\s*(.*)");
+
+	private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[([^\\]]+)\\]\\(([^)\\s]+)\\)");
+
+	private static final Pattern JOB_ID = Pattern.compile("[A-Za-z0-9_-]{1,100}");
+
 	private final HiringCafeProperties properties;
 
 	private final RestClient restClient;
@@ -84,11 +95,143 @@ class HiringCafeJobSource implements JobSource {
 		}
 		List<JobSearchResult> results = new ArrayList<>();
 		Map<String, String> summaries = summariesById(result.firstText());
+		Map<String, LocalDate> postedDates = postedDatesById(result.firstText());
 		for (JobCard card : cards.jobs()) {
-			toResult(card, summaries.get(card.id())).ifPresent(results::add);
+			toResult(card, summaries.get(card.id()), postedDates.get(card.id())).ifPresent(results::add);
 		}
 		int total = (cards.total() != null) ? cards.total() : results.size();
 		return new JobSearchPage(List.copyOf(results), total);
+	}
+
+	@Override
+	public JobDetails details(String externalId) {
+		if (externalId == null || !JOB_ID.matcher(externalId).matches()) {
+			throw new JobSourceException("That isn't a HiringCafe job ID");
+		}
+		ToolResult result = callTool("get_job_details", Map.of("job_id", externalId));
+		return parseDetails(externalId, result.firstText());
+	}
+
+	/**
+	 * Reads the {@code get_job_details} markdown: a linked title, the company in bold,
+	 * labelled lines such as "- **Compensation:** …", then "## Requirements summary" and
+	 * "## Full description" sections. Display text can change, so every part is
+	 * optional except the title.
+	 */
+	static JobDetails parseDetails(String externalId, String markdown) {
+		String title = null;
+		String url = null;
+		String company = null;
+		Map<String, String> facts = new LinkedHashMap<>();
+		StringBuilder summary = new StringBuilder();
+		StringBuilder description = new StringBuilder();
+		StringBuilder section = null;
+		for (String line : markdown.split("\n")) {
+			String text = line.strip();
+			if (section == null && title == null && text.startsWith("# ")) {
+				Matcher link = MARKDOWN_LINK.matcher(text.substring(2));
+				if (link.find()) {
+					title = link.group(1).strip();
+					url = link.group(2);
+				}
+				else {
+					title = text.substring(2).strip();
+				}
+			}
+			else if (text.startsWith("## ")) {
+				String heading = text.substring(3).strip().toLowerCase(Locale.ROOT);
+				section = heading.startsWith("requirements") ? summary
+						: heading.startsWith("full description") ? description : null;
+			}
+			else if (section != null) {
+				section.append(line).append('\n');
+			}
+			else if (company == null && text.startsWith("**") && text.endsWith("**") && text.length() > 4) {
+				company = text.substring(2, text.length() - 2).strip();
+			}
+			else {
+				Matcher fact = FACT_LINE.matcher(text);
+				if (fact.matches()) {
+					facts.put(fact.group(1).strip(), fact.group(2).strip());
+				}
+			}
+		}
+		if (title == null || title.isBlank()) {
+			throw new JobSourceException("HiringCafe answered in an unexpected format");
+		}
+		String link = facts.remove("View & apply");
+		facts.remove("Job ID");
+		LocalDate postedOn = parseDate(facts.get("Posted"));
+		String cleanUrl;
+		try {
+			cleanUrl = SourceUrls.normalize((url != null) ? url : link);
+		}
+		catch (IllegalArgumentException ex) {
+			cleanUrl = null;
+		}
+		return new JobDetails(externalId, title, company, cleanUrl, postedOn, facts,
+				blankToNull(summary.toString().strip()), paragraphs(description.toString()));
+	}
+
+	/**
+	 * Splits plain text into paragraphs at blank lines. Bullet characters on their own
+	 * line are joined with the line after them.
+	 */
+	static List<String> paragraphs(String text) {
+		List<String> paragraphs = new ArrayList<>();
+		for (String block : text.split("\\n\\s*\\n")) {
+			String paragraph = block.lines()
+				.map(String::strip)
+				.filter((line) -> !line.isEmpty())
+				.collect(Collectors.joining("\n"));
+			if (paragraph.isEmpty()) {
+				continue;
+			}
+			if (!paragraphs.isEmpty() && paragraphs.getLast().equals("•")) {
+				paragraphs.set(paragraphs.size() - 1, "• " + paragraph);
+			}
+			else {
+				paragraphs.add(paragraph.startsWith("•\n") ? "• " + paragraph.substring(2) : paragraph);
+			}
+		}
+		return List.copyOf(paragraphs);
+	}
+
+	/**
+	 * The "**Posted:** 2026-09-07" line of each job in the search markdown, by job ID.
+	 */
+	static Map<String, LocalDate> postedDatesById(String markdown) {
+		Map<String, LocalDate> dates = new HashMap<>();
+		if (markdown == null) {
+			return dates;
+		}
+		for (String section : markdown.split("\n### ")) {
+			Matcher id = JOB_ID_LINE.matcher(section);
+			Matcher posted = POSTED_LINE.matcher(section);
+			if (id.find() && posted.find()) {
+				LocalDate date = parseDate(posted.group(1));
+				if (date != null) {
+					dates.put(id.group(1), date);
+				}
+			}
+		}
+		return dates;
+	}
+
+	private static LocalDate parseDate(String text) {
+		if (text == null) {
+			return null;
+		}
+		try {
+			return LocalDate.parse(text.strip());
+		}
+		catch (DateTimeParseException ex) {
+			return null;
+		}
+	}
+
+	private static String blankToNull(String text) {
+		return (text == null || text.isBlank()) ? null : text;
 	}
 
 	/**
@@ -220,7 +363,7 @@ class HiringCafeJobSource implements JobSource {
 		}
 	}
 
-	private static Optional<JobSearchResult> toResult(JobCard card, String summary) {
+	private static Optional<JobSearchResult> toResult(JobCard card, String summary, LocalDate postedOn) {
 		if (isBlank(card.id()) || isBlank(card.title()) || isBlank(card.company())) {
 			return Optional.empty();
 		}
@@ -234,7 +377,7 @@ class HiringCafeJobSource implements JobSource {
 			url = null;
 		}
 		return Optional.of(new JobSearchResult(card.id(), card.title(), card.company(),
-				locationFrom(highlights), highlights, url, summary));
+				locationFrom(highlights), highlights, url, summary, postedOn));
 	}
 
 	/**

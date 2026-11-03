@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -148,7 +149,7 @@ public class SearchForm {
 		addLabels(parts, "", this.workplace, " or ");
 		addLabels(parts, "", this.seniority, " or ");
 		if (this.posted != null) {
-			parts.add((this.posted == 1) ? "Posted today" : "Posted in the last " + this.posted + " days");
+			parts.add("Posted: " + SearchOptions.postedWithin(this.posted).toLowerCase(Locale.ROOT));
 		}
 		addLabels(parts, "", this.type, " or ");
 		if (this.role != null) {

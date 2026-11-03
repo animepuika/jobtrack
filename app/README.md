@@ -66,7 +66,7 @@ Uploaded CVs then live in the `jobtrack-documents` volume.
 ./mvnw test
 ```
 
-164 tests: business rules, URL handling, the HiringCafe adapter against a local fake
+171 tests: business rules, URL handling, the HiringCafe adapter against a local fake
 server, search filters, paging and saved searches, the page states (welcome, paging,
 errors, final stages), CV upload checks and private downloads, CV reading and skill
 matching, progress figures and follow-ups with a fixed clock, the reminder outbox under
@@ -120,6 +120,7 @@ Flyway creates the schema from
 | `outbox_event` | Events waiting to be sent to the queue, or already sent |
 | `skill_profile`, `user_skill` | The user's skills and which CV they were read from; never the CV text |
 | `saved_search` | Named searches: the search page's address parameters |
+| `viewed_job` | IDs of search results the user opened, and when; not the listings |
 
 Migrations: [V1](src/main/resources/db/migration/V1__create_tracker_tables.sql) creates
 the tracker, [V2](src/main/resources/db/migration/V2__add_cv_versions_reminders_archive_date.sql)
@@ -127,7 +128,8 @@ adds CVs, reminders, the archive date, and the CV used per application, and
 [V3](src/main/resources/db/migration/V3__move_reminders_to_reminder_service.sql)
 hands existing reminders to the reminder service through the outbox;
 [V4](src/main/resources/db/migration/V4__add_skill_profile.sql) adds the skill profile;
-[V5](src/main/resources/db/migration/V5__add_saved_searches.sql) adds saved searches.
+[V5](src/main/resources/db/migration/V5__add_saved_searches.sql) adds saved searches;
+[V6](src/main/resources/db/migration/V6__add_viewed_jobs.sql) remembers opened results.
 
 ### CV files
 
@@ -177,6 +179,13 @@ once a filter is set.
 
 A search is a plain address (`/search?keywords=java&workplace=REMOTE&posted=7`), so
 it can be bookmarked or saved under a name and run again from the top of the page.
+
+Each result says when it was posted ("Posted 3 days ago") and what the employer asks
+for, and results can be ordered by fit, newest first, or HiringCafe's relevance. A
+result you have opened, on HiringCafe or on its **Details** page, is marked "Opened
+today" in later searches. The details page fetches `get_job_details` when it is
+opened (nothing is stored) and shows the facts, the requirements, how your skills
+fit, and the full description as plain text.
 
 `search_jobs` has no page or offset input, so **Next** repeats the search with
 `exclude_company_names` set to the companies already shown. The page links carry

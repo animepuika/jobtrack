@@ -5,7 +5,7 @@
     "content": [
       {
         "type": "text",
-        "text": "## HiringCafe job results (showing 2 of 12 matches)\n\n### [Junior Java Developer](https://hiringcafe.com/job/junior-java-developer-fixture00000001)\n**Example Logistics**\n- **Location:** Riga, Riga, Latvia\n- **Workplace:** Hybrid\n- **Job ID:** fixture00000001\n\nFictional summary: Java and Spring Boot with PostgreSQL; Docker is a plus.\n\n---\n\n### [Backend Intern](https://hiringcafe.com/job/backend-intern-fixture00000002)\n**Sample Health**\n- **Location:** Europe\n- **Job ID:** fixture00000002\n\nFictional summary: Python and Django.\n"
+        "text": "## HiringCafe job results (showing 2 of 12 matches)\n\n### [Junior Java Developer](https://hiringcafe.com/job/junior-java-developer-fixture00000001)\n**Example Logistics**\n- **Location:** Riga, Riga, Latvia\n- **Workplace:** Hybrid\n- **Posted:** 2026-10-30\n- **Job ID:** fixture00000001\n\nFictional summary: Java and Spring Boot with PostgreSQL; Docker is a plus.\n\n---\n\n### [Backend Intern](https://hiringcafe.com/job/backend-intern-fixture00000002)\n**Sample Health**\n- **Location:** Europe\n- **Job ID:** fixture00000002\n\nFictional summary: Python and Django.\n"
       }
     ],
     "_meta": {
@@ -16,14 +16,22 @@
             "title": "Junior Java Developer",
             "company": "Example Logistics",
             "logo": "https://example.com/favicon.png",
-            "meta": ["Riga, Riga · Hybrid", "30k–40k/yr", "Full Time · Entry Level"],
+            "meta": [
+              "Riga, Riga · Hybrid",
+              "30k–40k/yr",
+              "Full Time · Entry Level"
+            ],
             "url": "https://hiringcafe.com/job/junior-java-developer-fixture00000001?utm_source=claude&utm_medium=llm-app&utm_campaign=mcp"
           },
           {
             "id": "fixture00000002",
             "title": "Backend Intern",
             "company": "Sample Health",
-            "meta": ["Europe · Remote", "Pay not listed", "Internship · Entry Level"],
+            "meta": [
+              "Europe · Remote",
+              "Pay not listed",
+              "Internship · Entry Level"
+            ],
             "url": "https://hiringcafe.com/job/backend-intern-fixture00000002?utm_source=claude"
           },
           {

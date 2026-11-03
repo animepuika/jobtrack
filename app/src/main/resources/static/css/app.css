@@ -540,3 +540,40 @@ main.wide { max-width: max(var(--page-max), 1320px); }
 .close-moves .hint { margin: 0; }
 .close-moves button { width: 100%; justify-content: flex-start; }
 .board-column.finished .stage { align-self: flex-start; margin-top: 4px; }
+
+/* Search results: posting age, opened marks, requirements */
+.result-head h3 { margin: 0; }
+.result-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 0; font-size: var(--text-sm); color: var(--ink-2); }
+.result-meta .icon { width: 15px; height: 15px; }
+.posted, .opened-tag { display: inline-flex; align-items: center; gap: 5px; }
+.posted.fresh { color: var(--success); font-weight: 600; }
+.opened-tag { padding: 1px 8px 1px 6px; border-radius: var(--radius-pill); background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.result.viewed { background: var(--surface-2); }
+.result.viewed h3 a { color: var(--ink-2); }
+.result h3 a:visited { color: var(--ink-2); }
+.requirements { margin: 0; font-size: var(--text-sm); color: var(--ink-2); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.result-action { flex-wrap: wrap; gap: 8px; align-items: center; }
+.result-action form { margin: 0; }
+.posted-filter { margin-top: -4px; }
+
+/* Job details page */
+main.narrow-wide { max-width: calc(1080px + 2 * var(--page-pad)); }
+.job-header { margin: 8px 0 var(--space-5); }
+.job-header h1 { margin-bottom: 4px; }
+.job-company { font-size: 1.125rem; margin: 0; }
+.job-header .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.job-header .actions form { margin: 0; }
+.job-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: var(--space-5); align-items: start; }
+.job-main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.job-main .card h2, .job-facts h2 { margin-top: 0; font-size: 1.0625rem; }
+.description p { margin: 0 0 12px; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; max-width: 75ch; }
+.description p.bullet { margin: 0 0 6px; padding-left: 4px; }
+.job-facts { position: sticky; top: 16px; }
+.job-facts dl { margin: 0 0 12px; display: flex; flex-direction: column; }
+.job-facts dl div { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.job-facts dt { font-size: var(--text-xs); font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.03em; }
+.job-facts dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+@media (max-width: 800px) {
+	.job-columns { grid-template-columns: minmax(0, 1fr); }
+	.job-facts { position: static; order: -1; }
+}

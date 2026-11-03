@@ -19,4 +19,12 @@ public interface JobSource {
 	 */
 	JobSearchPage search(JobSearchQuery query);
 
+	/**
+	 * Everything the provider has about one job: facts, requirements and the full
+	 * description.
+	 * @throws JobSourceException if the provider is disabled, unavailable, doesn't know
+	 * the job, or answers with an error
+	 */
+	JobDetails details(String externalId);
+
 }

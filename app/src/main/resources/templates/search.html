@@ -57,15 +57,15 @@
 						th:value="${s}" th:checked="${form.seniority.contains(s)}"> <span th:text="${s.label()}">Entry</span></label>
 				</div>
 			</fieldset>
-			<div class="field">
-				<label for="posted">Posted</label>
-				<select id="posted" name="posted">
-					<option value="">Any time</option>
-					<option th:each="d : ${options.postedDays()}" th:value="${d}" th:selected="${form.posted == d}"
-						th:text="${d == 1} ? 'Today' : 'Last ' + ${d} + ' days'">Last 7 days</option>
-				</select>
-			</div>
 		</div>
+		<fieldset class="posted-filter">
+			<legend>Posted</legend>
+			<div class="choice-row">
+				<label class="choice"><input type="radio" name="posted" value="" th:checked="${form.posted == null}"> Any time</label>
+				<label class="choice" th:each="d : ${options.postedDays()}"><input type="radio" name="posted" th:value="${d}"
+					th:checked="${form.posted == d}"> <span th:text="${options.postedLabel(d)}">Past week</span></label>
+			</div>
+		</fieldset>
 		<p class="hint">Pick none for any. Ticking several in a group means any of them.</p>
 
 		<details class="more-filters" th:open="${form.moreFilterCount() > 0}">
@@ -278,28 +278,51 @@
 					th:value="${form.suggestedName()}" placeholder="Remote Java jobs">
 				<button type="submit"><svg th:replace="~{fragments :: icon-plus}"></svg>Save this search</button>
 			</form>
-			<div th:if="${hasSkills}" class="sort-row">
+			<div class="sort-row">
 				<span class="hint">Order on this page:</span>
-				<a th:if="${!byFit}" th:href="@{${links.sorted(null)}}">Best fit first</a>
-				<strong th:if="${byFit}">Best fit first</strong>
+				<th:block th:if="${hasSkills}">
+					<a th:unless="${order == 'fit'}" th:href="@{${links.sorted(null)}}">Best fit first</a>
+					<strong th:if="${order == 'fit'}" aria-current="true">Best fit first</strong>
+					<span aria-hidden="true">·</span>
+				</th:block>
+				<a th:unless="${order == 'newest'}" th:href="@{${links.sorted('newest')}}">Newest first</a>
+				<strong th:if="${order == 'newest'}" aria-current="true">Newest first</strong>
 				<span aria-hidden="true">·</span>
-				<a th:if="${byFit}" th:href="@{${links.sorted('provider')}}">HiringCafe's order</a>
-				<strong th:if="${!byFit}">HiringCafe's order</strong>
-				<span aria-hidden="true">·</span>
-				<a th:href="@{/skills}">Edit your skills</a>
+				<a th:unless="${order == 'provider'}" th:href="@{${links.sorted('provider')}}">Most relevant (HiringCafe)</a>
+				<strong th:if="${order == 'provider'}" aria-current="true">Most relevant (HiringCafe)</strong>
+				<th:block th:if="${hasSkills}">
+					<span aria-hidden="true">·</span>
+					<a th:href="@{/skills}">Edit your skills</a>
+				</th:block>
 			</div>
 			<p th:unless="${hasSkills}" class="hint results-hint"><a th:href="@{/skills}">Add your skills</a>, or read them
 				from your CV, to see how well each job fits you.</p>
 			<ul class="results">
-				<li th:each="r : ${results}" class="result" th:with="fit=${fits.get(r.externalId())}">
-					<div>
-						<h3><a th:href="${r.url()}" target="_blank" rel="noopener noreferrer"><span th:text="${r.title()}">Junior Java Developer</span><svg
-							th:replace="~{fragments :: icon-external}"></svg><span class="visually-hidden">(opens in a new tab)</span></a></h3>
+				<li th:each="r : ${results}" class="result"
+					th:with="fit=${fits.get(r.externalId())}, opened=${viewed.get(r.externalId())},
+						detailsLink=@{/search/jobs/{id}(id=${r.externalId()}, back=${links.current()})},
+						openLink=${r.url() != null} ? @{/search/open(id=${r.externalId()}, url=${r.url()})} : null"
+					th:classappend="${opened != null} ? 'viewed'">
+					<div class="result-head">
+						<h3><a th:href="${detailsLink}" th:text="${r.title()}">Junior Java Developer</a></h3>
 						<p class="subtitle" th:text="${r.company()}">Example Logistics</p>
+						<p class="result-meta">
+							<span th:if="${r.postedOn() != null}" class="posted"
+								th:classappend="${@ages.daysSince(r.postedOn()) <= 3} ? 'fresh'">
+								<svg th:replace="~{fragments :: icon-clock}"></svg>
+								<span>Posted <time th:datetime="${r.postedOn()}" th:text="${@ages.ago(r.postedOn())}"
+									th:title="${#temporals.format(r.postedOn(), 'd MMMM yyyy')}">3 days ago</time></span>
+							</span>
+							<span th:if="${opened != null}" class="opened-tag">
+								<svg th:replace="~{fragments :: icon-check}"></svg><span th:text="'Opened ' + ${@ages.ago(opened)}">Opened today</span>
+							</span>
+						</p>
 					</div>
 					<ul class="chips" aria-label="Highlights">
 						<li th:each="h : ${r.highlights()}" th:text="${h}">Riga · Hybrid</li>
 					</ul>
+					<p th:if="${r.summary() != null}" class="requirements"><span class="label">They ask for:</span>
+						<span th:text="${r.summary()}">Bachelor's degree in computer science; 0–2 years of Java.</span></p>
 					<div th:if="${fit != null}" class="fit" th:classappend="'fit-' + ${#strings.toLowerCase(fit.level().name())}">
 						<p class="fit-level">
 							<strong th:text="${fit.level().label}">Strong fit</strong>
@@ -313,6 +336,9 @@
 							<span th:text="${#strings.listJoin(fit.missing(), ', ')}">Kubernetes</span></p>
 					</div>
 					<div class="result-action">
+						<a class="button subtle" th:href="${detailsLink}">Details</a>
+						<a th:if="${openLink}" class="button" th:href="${openLink}" target="_blank" rel="noopener">HiringCafe<svg
+							th:replace="~{fragments :: icon-external}"></svg><span class="visually-hidden">(opens in a new tab)</span></a>
 						<a th:if="${tracked[r.externalId()]}" class="button tracked"
 							th:href="@{/applications/{id}(id=${tracked[r.externalId()]})}"><svg th:replace="~{fragments :: icon-check}"></svg>Tracked · open</a>
 						<form th:unless="${tracked[r.externalId()]}" th:action="@{/search/track}" method="post">

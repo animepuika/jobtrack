@@ -22,4 +22,9 @@ class DisabledJobSource implements JobSource {
 		throw new JobSourceException("Live job search is turned off in this environment. You can still add jobs by hand.");
 	}
 
+	@Override
+	public JobDetails details(String externalId) {
+		throw new JobSourceException("Live job search is turned off in this environment. You can still add jobs by hand.");
+	}
+
 }
