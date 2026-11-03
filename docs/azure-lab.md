@@ -12,13 +12,27 @@ that needs your Azure account and the cost checks below.
 
 All in one resource group (`jobtrack-lab`), tagged `purpose=jobtrack-lab`:
 
-| Resource | Purpose | Cost notes to check |
+| Resource | Purpose | Cost notes (checked November 3, 2026) |
 | --- | --- | --- |
-| Container Apps environment (Consumption) | Runs both services | Container Apps has a monthly free grant of vCPU-seconds, memory and requests per subscription |
-| Container app `jobtrack-app` | Public HTTPS tracker with demo data, scales to zero | Billed only while running beyond the free grant |
-| Container app `jobtrack-reminders` | Internal reminder service, scales to zero, woken by a queue rule | Same |
+| Container Apps environment (Consumption) | Runs both services | Free grant per subscription per month: 180,000 vCPU-seconds, 360,000 GiB-seconds, 2 million requests |
+| Container app `jobtrack-app` | Public HTTPS tracker with demo data, scales to zero | 0.5 vCPU / 1 GiB: about 100 hours of running time fits in the free grant |
+| Container app `jobtrack-reminders` | Internal reminder service, scales to zero, woken by a queue rule | 0.25 vCPU / 0.5 GiB; shares the same grant |
 | Storage account (Standard LRS) | Event queues and a private `cv-files` container | Pennies at lab volumes, but not zero; not covered by Container Apps' grant |
-| Log Analytics workspace | Container logs | Capped at 0.1 GB a day in the template; first 5 GB a month were free at the time of planning |
+| Log Analytics workspace | Container logs | First 5 GB a month per billing account free, 31 days' retention free; the template caps ingestion at 0.1 GB a day |
+
+A two-hour lab session should stay inside the free grants, apart from a few cents of
+storage, which trial or student credit covers.
+
+### Which Azure account to use
+
+| Option | What you get | Notes |
+| --- | --- | --- |
+| Azure for Students | $100 credit for 12 months, no card | Needs a current student email at an eligible school; the subscription is disabled when the credit runs out unless you upgrade |
+| Azure free account | $200 credit for 30 days, plus 12 months of free amounts of popular services | Needs a Microsoft or GitHub account, a phone and a non-prepaid card (identity check, possibly a temporary $1 hold). You are not charged unless you choose pay-as-you-go. One per person |
+
+Start the free account's 30 days close to the lab session. Neon's Free plan needs no
+card: 100 CU-hours of compute and 1 GB of storage per project each month, and its
+compute suspends after 5 minutes idle and wakes on the next query.
 
 Not created in Azure:
 
