@@ -66,9 +66,10 @@ Uploaded CVs then live in the `jobtrack-documents` volume.
 ./mvnw test
 ```
 
-115 tests: business rules, URL handling, the HiringCafe adapter against a local fake
+136 tests: business rules, URL handling, the HiringCafe adapter against a local fake
 server, the page states (welcome, paging, errors, final stages), CV upload checks
-and private downloads, reminders, the export, and integration tests that run the whole app against a real PostgreSQL
+and private downloads, CV reading and skill matching, the reminder outbox under
+failures, the export, and integration tests that run the whole app against a real PostgreSQL
 started by Testcontainers. No test calls the real HiringCafe.
 
 Without Docker, point the tests at an existing PostgreSQL instead:
@@ -88,6 +89,7 @@ com.jobtrack
 ├── tracking    the core: jobs, applications, stage rules, history (no web code)
 ├── jobsource   HiringCafe adapter behind a JobSource interface, and job import
 ├── documents   CV versions: upload checks, private file storage, ownership
+├── matching    skills from the CV, skill catalog, fit scoring
 ├── reminders   reminder commands and reads; the reminders themselves live in the reminder service
 ├── events      transactional outbox and the publisher that sends events to the queue
 ├── export      collects one user's records into a JSON export
@@ -115,12 +117,14 @@ Flyway creates the schema from
 | `cv_version` | Uploaded CV details and a random storage key; the file itself is in document storage |
 | `reminder_ref` | Which reminders exist, whose they are, their latest event version and whether they are open. The reminders themselves are in the reminder service's database |
 | `outbox_event` | Events waiting to be sent to the queue, or already sent |
+| `skill_profile`, `user_skill` | The user's skills and which CV they were read from; never the CV text |
 
 Migrations: [V1](src/main/resources/db/migration/V1__create_tracker_tables.sql) creates
 the tracker, [V2](src/main/resources/db/migration/V2__add_cv_versions_reminders_archive_date.sql)
 adds CVs, reminders, the archive date, and the CV used per application, and
 [V3](src/main/resources/db/migration/V3__move_reminders_to_reminder_service.sql)
-hands existing reminders to the reminder service through the outbox.
+hands existing reminders to the reminder service through the outbox;
+[V4](src/main/resources/db/migration/V4__add_skill_profile.sql) adds the skill profile.
 
 ### CV files
 
@@ -131,6 +135,21 @@ hands existing reminders to the reminder service through the outbox.
 - Served only to their owner, always as a download with `nosniff`, never inline.
 - The [DocumentStorage](src/main/java/com/jobtrack/documents/DocumentStorage.java)
   interface lets private Azure Blob Storage replace the local folder later.
+
+### CV skill matching
+
+From **Your CVs → Use for matching** (or the **Your skills** page), JobTrack reads the
+CV's text in memory with Apache PDFBox (PDF) or the JDK's zip reader (Word), finds
+known skills with [SkillCatalog](src/main/java/com/jobtrack/matching/SkillCatalog.java),
+and stores only the skill names and how often each appeared. You can remove skills
+and add your own.
+
+On the search page each result shows **Strong fit**, **Some fit**, **Low fit** or
+**Not enough detail**, with the skills you have and the ones you are missing, based
+on HiringCafe's requirements summary for that job. Results can be sorted by fit.
+There is no AI model: the matching is plain text rules, so every result can be
+explained. "Java" does not match "JavaScript", and words like "spring" or "rest" only
+count in a technical phrase.
 
 ### Reminders
 
@@ -210,5 +229,4 @@ Only jobs the user chooses are saved. When search fails, manual entry still work
 
 ## Not built yet
 
-The temporary Azure deployment, splitting reminders into their own service, and the
-portfolio release are milestones 8–10.
+The Azure deployment is prepared but not run: see [docs/azure-lab.md](../docs/azure-lab.md).
