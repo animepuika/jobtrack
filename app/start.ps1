@@ -111,22 +111,14 @@ if (-not $hasAccount -and -not $env:JOBTRACK_USERNAME) {
 }
 
 if (-not $NoBrowser) {
-	# Opens the browser once the tracker answers; gives up after about 4 minutes.
-	Start-Job -ArgumentList $url -ScriptBlock {
-		param($address)
-		for ($i = 0; $i -lt 120; $i++) {
-			try {
-				Invoke-WebRequest -UseBasicParsing "$($address)login" -TimeoutSec 2 | Out-Null
-				Start-Process $address
-				return
-			}
-			catch {
-				Start-Sleep -Seconds 2
-			}
-		}
-	} | Out-Null
+	# A small hidden PowerShell waits until the tracker answers, opens the browser and
+	# ends; it gives up after about 4 minutes. A separate process (not Start-Job) is
+	# used because background jobs can't always open windows.
+	$opener = "for (`$i = 0; `$i -lt 120; `$i++) { try { Invoke-WebRequest -UseBasicParsing '$($url)login' -TimeoutSec 2 | Out-Null; Start-Process '$url'; break } catch { Start-Sleep -Seconds 2 } }"
+	$encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($opener))
+	Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile', '-EncodedCommand', $encoded
 }
 
-Write-Step "Starting JobTrack on $url (press Ctrl+C to stop it)"
+Write-Step "Starting JobTrack on $url (it opens in your browser when ready; press Ctrl+C to stop it)"
 $env:SERVER_PORT = "$Port"
 & .\mvnw.cmd -q spring-boot:run
