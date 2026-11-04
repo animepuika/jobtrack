@@ -577,3 +577,17 @@ main.narrow-wide { max-width: calc(1080px + 2 * var(--page-pad)); }
 	.job-columns { grid-template-columns: minmax(0, 1fr); }
 	.job-facts { position: static; order: -1; }
 }
+
+/* Search: CV panel, CV options and job languages */
+.cv-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 380px); gap: var(--space-4) var(--space-6); align-items: start; margin-bottom: var(--space-4); border-left: 4px solid var(--accent); }
+.cv-panel h2 { margin: 0 0 6px; font-size: 1.0625rem; }
+.cv-panel p { margin: 0 0 6px; }
+.cv-skills { margin-top: 8px; }
+.cv-upload { display: flex; flex-direction: column; gap: 8px; }
+.cv-upload input[type="file"] { max-width: 100%; font-size: var(--text-sm); }
+.cv-upload button { align-self: flex-start; }
+.cv-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--accent-soft); }
+.cv-row .hint { flex: 1 1 260px; }
+.job-languages { margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
+.job-languages .label { margin-right: 4px; }
+@media (max-width: 800px) { .cv-panel { grid-template-columns: minmax(0, 1fr); } }

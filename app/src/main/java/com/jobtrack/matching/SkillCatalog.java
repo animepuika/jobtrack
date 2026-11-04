@@ -1,9 +1,12 @@
 package com.jobtrack.matching;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -93,6 +96,10 @@ public final class SkillCatalog {
 		add("Domain-driven design", "domain[- ]driven design|\\bddd\\b");
 	}
 
+	private static final Set<String> SEARCH_WORTHY = Set.of("Java", "Kotlin", "Scala", "Python", "JavaScript",
+			"TypeScript", "C#", "C++", "Go", "Rust", "PHP", "Ruby", "Swift", "Spring Boot", "Spring", "Jakarta EE",
+			"Quarkus", "Micronaut", "React", "Angular", "Vue", "Node.js", ".NET", "Django", "Flask");
+
 	private SkillCatalog() {
 	}
 
@@ -153,6 +160,32 @@ public final class SkillCatalog {
 					Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 		}
 		return pattern.matcher(text).find();
+	}
+
+	/**
+	 * The user's skills that make the best search words: programming languages and
+	 * frameworks, most mentioned first, then in catalog order. Tools such as Git appear
+	 * in almost every posting, so they are used only when nothing better is there.
+	 */
+	public static List<String> searchTerms(List<UserSkill> skills, int max) {
+		List<String> catalogOrder = List.copyOf(SKILLS.keySet());
+		Comparator<UserSkill> strongestFirst = Comparator.comparingInt(UserSkill::getWeight)
+			.reversed()
+			.thenComparingInt((skill) -> {
+				int index = catalogOrder.indexOf(skill.getName());
+				return (index < 0) ? Integer.MAX_VALUE : index;
+			});
+		List<String> worthy = skills.stream()
+			.filter((skill) -> SEARCH_WORTHY.contains(skill.getName()))
+			.sorted(strongestFirst)
+			.map(UserSkill::getName)
+			.filter((name) -> !name.equals("Spring") || skills.stream().noneMatch((s) -> s.getName().equals("Spring Boot")))
+			.limit(max)
+			.toList();
+		if (!worthy.isEmpty()) {
+			return worthy;
+		}
+		return skills.stream().sorted(strongestFirst).map(UserSkill::getName).limit(max).toList();
 	}
 
 	private static boolean fullMatch(Pattern pattern, String value) {

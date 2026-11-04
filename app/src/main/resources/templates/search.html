@@ -28,6 +28,41 @@
 		</ul>
 	</section>
 
+	<!--/* Step 1: the CV. Results are matched to the skills read from it. */-->
+	<section th:if="${searchEnabled}" class="card cv-panel" aria-labelledby="cv-heading">
+		<div class="cv-panel-text">
+			<h2 id="cv-heading">
+				<th:block th:if="${cvSkills.isEmpty()}">Match jobs to your CV</th:block>
+				<th:block th:unless="${cvSkills.isEmpty()}">Matching jobs to your CV</th:block>
+			</h2>
+			<th:block th:if="${cvSkills.isEmpty()}">
+				<p>Upload your CV and JobTrack reads your skills from it. Every result then shows how well it fits you,
+					the best fits come first, and you can hide the ones that don't fit.</p>
+				<p class="hint">PDF or Word, up to 5 MB. The file stays private on this computer, and only the skill
+					names are used for matching. No AI is involved.</p>
+			</th:block>
+			<th:block th:unless="${cvSkills.isEmpty()}">
+				<p class="hint">
+					<th:block th:if="${cvProfile != null and cvProfile.cvLabel != null}">Read from
+						<strong th:text="${cvProfile.cvLabel}">Backend CV</strong> ·</th:block>
+					<span th:text="${cvSkills.size()} + ' skills'">14 skills</span> ·
+					<a th:href="@{/skills}">Edit your skills</a>
+				</p>
+				<ul class="chips cv-skills" aria-label="Your skills">
+					<li th:each="skill : ${cvSkills.size() > 14 ? cvSkills.subList(0, 14) : cvSkills}" th:text="${skill}">Java</li>
+					<li th:if="${cvSkills.size() > 14}" th:text="'+' + ${cvSkills.size() - 14} + ' more'">+3 more</li>
+				</ul>
+			</th:block>
+		</div>
+		<form th:action="@{/search/cv}" method="post" enctype="multipart/form-data" class="cv-upload">
+			<input type="hidden" name="query" th:value="${links.formQuery()}">
+			<label for="cv-file" th:text="${cvSkills.isEmpty()} ? 'Your CV' : 'Use a newer CV'">Your CV</label>
+			<input id="cv-file" type="file" name="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+			<button type="submit" th:classappend="${cvSkills.isEmpty()} ? 'primary'">
+				<th:block th:text="${cvSkills.isEmpty()} ? 'Read my CV' : 'Replace and re-read'">Read my CV</th:block></button>
+		</form>
+	</section>
+
 	<form th:if="${searchEnabled}" id="search-form" th:action="@{/search}" method="get" class="card search-form"
 		role="search" aria-label="Search HiringCafe" th:object="${form}">
 		<div class="search-main">
@@ -67,6 +102,14 @@
 			</div>
 		</fieldset>
 		<p class="hint">Pick none for any. Ticking several in a group means any of them.</p>
+
+		<div th:unless="${cvSkills.isEmpty()}" class="cv-row">
+			<label class="check"><input type="checkbox" name="goodFit" value="true" th:checked="${form.goodFit}">
+				Hide jobs that don't fit my CV</label>
+			<button type="submit" name="fromCv" value="true"><svg th:replace="~{fragments :: icon-search}"></svg>Find jobs for my CV</button>
+			<span class="hint">With the Keywords box empty, this searches for your strongest languages and frameworks,
+				with the filters above.</span>
+		</div>
 
 		<details class="more-filters" th:open="${form.moreFilterCount() > 0}">
 			<summary>More filters<span th:if="${form.moreFilterCount() > 0}" th:text="' (' + ${form.moreFilterCount()} + ' on)'"> (2 on)</span></summary>
@@ -147,11 +190,12 @@
 							<input id="languages" type="text" th:field="*{languages}" placeholder="English, Latvian">
 						</div>
 						<div class="field">
-							<label for="countries">Company based in</label>
-							<input id="countries" type="text" th:field="*{countries}" placeholder="Latvia, Germany">
+							<label for="countries">Company headquarters in</label>
+							<input id="countries" type="text" th:field="*{countries}" placeholder="Latvia, Germany, Estonia">
 						</div>
 					</div>
-					<p class="hint">Distance only works with a city. Separate several entries with commas.</p>
+					<p class="hint">Separate several countries or languages with commas. Headquarters is where the company is based,
+						not where the job is: use Location at the top for that. Distance only works with a city.</p>
 				</fieldset>
 
 				<fieldset class="filter-group">
@@ -216,9 +260,6 @@
 		</details>
 	</form>
 
-	<p th:if="${searchEnabled and hasSkills and form.isEmpty()}" class="hint">
-		<a th:href="@{/search(keywords=${skillSearch})}">Search with my skills</a> (<span th:text="${skillSearch}">java spring boot</span>)
-		· <a th:href="@{/skills}">Edit your skills</a></p>
 	<div th:if="${searchEnabled and form.isEmpty()}" class="empty narrow-card">
 		<p class="empty-title">Start with a few keywords, or just filters</p>
 		<p class="empty-text">A job title or a skill works best, like “junior java developer”. You can also leave the
@@ -295,8 +336,11 @@
 					<a th:href="@{/skills}">Edit your skills</a>
 				</th:block>
 			</div>
-			<p th:unless="${hasSkills}" class="hint results-hint"><a th:href="@{/skills}">Add your skills</a>, or read them
-				from your CV, to see how well each job fits you.</p>
+			<p th:unless="${hasSkills}" class="hint results-hint"><a href="#cv-heading">Upload your CV</a> at the top to see
+				how well each job fits you.</p>
+			<p th:if="${hiddenLowFit != null and hiddenLowFit > 0}" class="hint results-hint">
+				<th:block th:text="${hiddenLowFit == 1} ? '1 job on this page is hidden because it does not fit your CV.' : ${hiddenLowFit} + ' jobs on this page are hidden because they do not fit your CV.'">2 jobs are hidden.</th:block>
+				Untick “Hide jobs that don't fit my CV” to see them.</p>
 			<ul class="results">
 				<li th:each="r : ${results}" class="result"
 					th:with="fit=${fits.get(r.externalId())}, opened=${viewed.get(r.externalId())},
@@ -321,6 +365,11 @@
 					<ul class="chips" aria-label="Highlights">
 						<li th:each="h : ${r.highlights()}" th:text="${h}">Riga · Hybrid</li>
 					</ul>
+					<p class="job-languages" th:with="langs=${languages.get(r.externalId())}">
+						<span class="label">Language:</span>
+						<span th:unless="${langs.isEmpty()}" th:text="${#strings.listJoin(langs, ', ')}">German, English</span>
+						<span th:if="${langs.isEmpty()}" class="hint">not stated in the summary</span>
+					</p>
 					<p th:if="${r.summary() != null}" class="requirements"><span class="label">They ask for:</span>
 						<span th:text="${r.summary()}">Bachelor's degree in computer science; 0–2 years of Java.</span></p>
 					<div th:if="${fit != null}" class="fit" th:classappend="'fit-' + ${#strings.toLowerCase(fit.level().name())}">

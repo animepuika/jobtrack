@@ -194,6 +194,15 @@ today" in later searches. The details page fetches `get_job_details` when it is
 opened (nothing is stored) and shows the facts, the requirements, how your skills
 fit, and the full description as plain text.
 
+**Matching to your CV from the search page:** upload a CV (PDF or Word) at the top of
+the search page. It is saved as a CV version and its skills are read, so every result
+shows how well it fits, best fits first. "Hide jobs that don't fit my CV" removes low
+fits from each page, and "Find jobs for my CV" searches for your strongest languages
+and frameworks together with the chosen filters. Each result also lists its
+language: the languages its requirements mention, plus any language you filtered
+on. HiringCafe filters by language but doesn't return a job's languages, so this is
+read from the text and labelled accordingly.
+
 `search_jobs` has no page or offset input, so **Next** repeats the search with
 `exclude_company_names` set to the companies already shown. The page links carry
 those names and how many each page added, which lets **Previous** drop exactly the

@@ -1,17 +1,24 @@
 package com.jobtrack.web;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
 
+import com.jobtrack.documents.CvService;
+import com.jobtrack.documents.CvVersion;
 import com.jobtrack.jobsource.JobImportService;
 import com.jobtrack.jobsource.JobImportService.ImportResult;
 import com.jobtrack.jobsource.JobDetails;
@@ -19,10 +26,13 @@ import com.jobtrack.jobsource.JobSearchPage;
 import com.jobtrack.jobsource.JobSearchResult;
 import com.jobtrack.jobsource.JobSource;
 import com.jobtrack.jobsource.JobSourceException;
+import com.jobtrack.jobsource.LanguageMentions;
 import com.jobtrack.jobsource.SavedSearchService;
 import com.jobtrack.jobsource.ViewedJobService;
 import com.jobtrack.matching.FitScorer;
 import com.jobtrack.matching.FitScorer.Fit;
+import com.jobtrack.matching.FitScorer.Level;
+import com.jobtrack.matching.SkillCatalog;
 import com.jobtrack.matching.SkillProfileService;
 import com.jobtrack.matching.UserSkill;
 import com.jobtrack.tracking.TrackingService;
@@ -40,6 +50,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.view.RedirectView;
 
@@ -58,6 +69,12 @@ class SearchPageController {
 
 	private final SkillProfileService skills;
 
+	/**
+	 * How many of the strongest CV skills "Find jobs for my CV" searches for. HiringCafe
+	 * matches keywords against the posting, so more words means fewer results.
+	 */
+	private static final int CV_KEYWORDS = 2;
+
 	private static final Pattern JOB_ID = Pattern.compile("[A-Za-z0-9_-]{1,100}");
 
 	private static final Pattern BACK_LINK = Pattern.compile("/search(\\?[A-Za-z0-9=&%+._~*-]{0,4000})?");
@@ -66,22 +83,34 @@ class SearchPageController {
 
 	private final ViewedJobService viewedJobs;
 
+	private final CvService cvVersions;
+
 	SearchPageController(JobSource jobSource, JobImportService imports, TrackingService tracking,
-			SkillProfileService skills, SavedSearchService savedSearches, ViewedJobService viewedJobs) {
+			SkillProfileService skills, SavedSearchService savedSearches, ViewedJobService viewedJobs,
+			CvService cvVersions) {
 		this.jobSource = jobSource;
 		this.imports = imports;
 		this.tracking = tracking;
 		this.skills = skills;
 		this.savedSearches = savedSearches;
 		this.viewedJobs = viewedJobs;
+		this.cvVersions = cvVersions;
 	}
 
 	@GetMapping("/search")
 	String search(@AuthenticationPrincipal JobTrackUser user, @ModelAttribute("form") SearchForm form,
 			BindingResult binding, @RequestParam(required = false) String sort,
 			@RequestParam(required = false) List<String> seen, @RequestParam(required = false) List<Integer> per,
-			Model model) {
-		List<String> userSkills = this.skills.list(user.getId()).stream().map(UserSkill::getName).toList();
+			@RequestParam(defaultValue = "false") boolean fromCv, Model model) {
+		List<UserSkill> skillProfile = this.skills.list(user.getId());
+		List<String> userSkills = skillProfile.stream().map(UserSkill::getName).toList();
+		if (fromCv && !userSkills.isEmpty() && (form.getKeywords() == null || form.getKeywords().isBlank())) {
+			// "Find jobs for my CV": search for the strongest languages and frameworks, with
+			// the chosen filters.
+			form.setKeywords(String.join(" ", SkillCatalog.searchTerms(skillProfile, CV_KEYWORDS)));
+		}
+		model.addAttribute("cvProfile", this.skills.profileOf(user.getId()).orElse(null));
+		model.addAttribute("cvSkills", userSkills);
 		String chosenOrder = ("provider".equals(sort) || "newest".equals(sort)) ? sort : null;
 		boolean byFit = !userSkills.isEmpty() && chosenOrder == null;
 		Links links = Links.of(form.toQueryString(), chosenOrder, seen, per);
@@ -124,6 +153,12 @@ class SearchPageController {
 						FitScorer.score(result.matchingText(), userSkills)));
 			}
 			List<JobSearchResult> results = page.results();
+			if (form.isGoodFit() && !userSkills.isEmpty()) {
+				results = results.stream()
+					.filter((result) -> fits.get(result.externalId()).level() != Level.LOW)
+					.toList();
+				model.addAttribute("hiddenLowFit", page.results().size() - results.size());
+			}
 			if (byFit) {
 				results = results.stream()
 					.sorted(Comparator.comparing((JobSearchResult result) -> fits.get(result.externalId()).level())
@@ -142,6 +177,7 @@ class SearchPageController {
 			model.addAttribute("tracked", tracked);
 			model.addAttribute("viewed", this.viewedJobs.lastViewed(user.getId(), this.jobSource.provider(),
 					page.results().stream().map(JobSearchResult::externalId).toList()));
+			model.addAttribute("languages", languagesByJob(page.results(), SearchForm.split(form.getLanguages())));
 		}
 		catch (JobSourceException ex) {
 			model.addAttribute("searchError", ex.getMessage());
@@ -184,6 +220,9 @@ class SearchPageController {
 			this.viewedJobs.markViewed(user.getId(), this.jobSource.provider(), id);
 			List<String> userSkills = this.skills.list(user.getId()).stream().map(UserSkill::getName).toList();
 			model.addAttribute("job", job);
+			model.addAttribute("jobLanguages", LanguageMentions.in(String.join("\n",
+					(job.requirementsSummary() != null) ? job.requirementsSummary() : "",
+					String.join("\n", job.description()))));
 			model.addAttribute("fit", userSkills.isEmpty() ? null : FitScorer.score(job.matchingText(), userSkills));
 			model.addAttribute("trackedId",
 					this.tracking.findTrackedApplicationId(user.getId(), this.jobSource.provider(), id).orElse(null));
@@ -192,6 +231,69 @@ class SearchPageController {
 			model.addAttribute("detailsError", ex.getMessage());
 		}
 		return "job-details";
+	}
+
+	/**
+	 * Uploads a CV from the search page and reads its skills, so the results that
+	 * follow are matched to it. The CV is kept like any other CV version.
+	 */
+	@PostMapping("/search/cv")
+	String uploadCv(@AuthenticationPrincipal JobTrackUser user, @RequestParam("file") MultipartFile file,
+			@RequestParam(defaultValue = "") String query, RedirectAttributes redirect) {
+		try (InputStream content = file.getInputStream()) {
+			CvVersion cv = this.cvVersions.upload(user.getId(), cvLabel(file.getOriginalFilename()),
+					file.getOriginalFilename(), file.getSize(), content);
+			try {
+				int found = this.skills.readFromCv(user.getId(), cv.getId()).size();
+				redirect.addFlashAttribute("success", "Read your CV: " + found + " skills. Results are now matched "
+						+ "to it, best fit first.");
+			}
+			catch (IllegalArgumentException ex) {
+				redirect.addFlashAttribute("error", "The CV was saved, but " + lowerFirst(ex.getMessage()));
+			}
+		}
+		catch (IllegalArgumentException ex) {
+			redirect.addFlashAttribute("error", ex.getMessage());
+		}
+		catch (IOException ex) {
+			throw new UncheckedIOException(ex);
+		}
+		return (!query.isEmpty() && SavedSearchService.isSafeQuery(query)) ? "redirect:/search?" + query
+				: "redirect:/search";
+	}
+
+	/**
+	 * Languages each result mentions, plus the ones the search asked for: HiringCafe
+	 * only returns jobs that need those.
+	 */
+	static Map<String, List<String>> languagesByJob(List<JobSearchResult> results, List<String> required) {
+		Map<String, List<String>> languages = new HashMap<>();
+		for (JobSearchResult result : results) {
+			Set<String> all = new LinkedHashSet<>(LanguageMentions.in(result.summary()));
+			required.forEach((language) -> {
+				if (all.stream().noneMatch(language::equalsIgnoreCase)) {
+					all.add(language);
+				}
+			});
+			languages.put(result.externalId(), List.copyOf(all));
+		}
+		return languages;
+	}
+
+	/**
+	 * The CV's name: the file name without its extension, or the date if that is empty.
+	 */
+	static String cvLabel(String filename) {
+		String name = (filename == null) ? "" : filename.replaceAll("^.*[\\\\/]", "").replaceAll("\\.[^.]*$", "");
+		name = name.replaceAll("[\\s_]+", " ").strip();
+		if (name.isEmpty()) {
+			return "CV";
+		}
+		return (name.length() > 100) ? name.substring(0, 100).strip() : name;
+	}
+
+	private static String lowerFirst(String text) {
+		return text.isEmpty() ? text : Character.toLowerCase(text.charAt(0)) + text.substring(1);
 	}
 
 	static boolean isHiringCafeLink(String url) {

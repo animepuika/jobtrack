@@ -83,6 +83,8 @@ public class SearchForm {
 
 	private Integer perCompany;
 
+	private boolean goodFit;
+
 	/**
 	 * The query for the provider. {@code skip} adds companies shown on earlier pages to
 	 * the ones the user chose to hide.
@@ -176,7 +178,7 @@ public class SearchForm {
 			parts.add("No degree required");
 		}
 		addText(parts, "Languages: ", this.languages);
-		addText(parts, "Company based in ", this.countries);
+		addText(parts, "Company headquarters in ", this.countries);
 		addText(parts, "Only ", this.companies);
 		addText(parts, "Hiding ", this.hideCompanies);
 		addLabels(parts, "", this.perk, ", ");
@@ -185,6 +187,9 @@ public class SearchForm {
 		}
 		if (this.perCompany != null) {
 			parts.add("Up to " + this.perCompany + " jobs per company");
+		}
+		if (this.goodFit) {
+			parts.add("Fits my CV");
 		}
 		return parts;
 	}
@@ -235,6 +240,7 @@ public class SearchForm {
 		addAll(query, "perk", this.perk);
 		add(query, "quickApply", this.quickApply ? "true" : null);
 		add(query, "perCompany", this.perCompany);
+		add(query, "goodFit", this.goodFit ? "true" : null);
 		return query.toString();
 	}
 
@@ -493,6 +499,18 @@ public class SearchForm {
 
 	public void setPerCompany(Integer perCompany) {
 		this.perCompany = perCompany;
+	}
+
+	/**
+	 * Hide results whose requirements mostly don't match the user's skills. Applied by
+	 * JobTrack after the search, because HiringCafe doesn't know the CV.
+	 */
+	public boolean isGoodFit() {
+		return this.goodFit;
+	}
+
+	public void setGoodFit(boolean goodFit) {
+		this.goodFit = goodFit;
 	}
 
 }

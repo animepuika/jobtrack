@@ -74,6 +74,10 @@
 			<aside class="job-facts card" aria-labelledby="facts-heading">
 				<h2 id="facts-heading">At a glance</h2>
 				<dl>
+					<div>
+						<dt>Languages mentioned</dt>
+						<dd th:text="${jobLanguages.isEmpty()} ? 'None stated' : ${#strings.listJoin(jobLanguages, ', ')}">German, English</dd>
+					</div>
 					<div th:each="fact : ${job.facts()}" th:unless="${fact.key == 'Posted'}">
 						<dt th:text="${fact.key}">Compensation</dt>
 						<dd th:text="${fact.value}">$89,210 – $144,960/yr</dd>

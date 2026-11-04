@@ -20,7 +20,9 @@ import com.jobtrack.jobsource.JobSource;
 import com.jobtrack.jobsource.JobSourceException;
 import com.jobtrack.jobsource.SavedSearch;
 import com.jobtrack.jobsource.SavedSearchService;
+import com.jobtrack.documents.CvService;
 import com.jobtrack.matching.SkillProfileService;
+import com.jobtrack.matching.TestCvFiles;
 import com.jobtrack.tracking.SourceProvider;
 import com.jobtrack.user.JobTrackUser;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +32,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +44,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
@@ -73,6 +77,9 @@ class SearchPageIntegrationTest {
 
 	@Autowired
 	private Clock clock;
+
+	@Autowired
+	private CvService cvVersions;
 
 	@MockitoBean
 	private JobSource jobSource;
@@ -276,6 +283,76 @@ class SearchPageIntegrationTest {
 	}
 
 	@Test
+	void aCvUploadedOnTheSearchPageIsReadAndResultsAreMatchedToIt() throws Exception {
+		MockMultipartFile cv = new MockMultipartFile("file", "Backend_CV.pdf", "application/pdf",
+				TestCvFiles.pdf(List.of("Fictional Person", "Skills: Java, Spring Boot, PostgreSQL")));
+
+		this.mvc
+			.perform(multipart("/search/cv").file(cv)
+				.param("query", "keywords=developer&workplace=REMOTE")
+				.with(user(this.user))
+				.with(csrf()))
+			.andExpect(redirectedUrl("/search?keywords=developer&workplace=REMOTE"))
+			.andExpect(flash().attribute("success", "Read your CV: 3 skills. Results are now matched to it, best fit first."));
+
+		assertThat(this.cvVersions.list(this.user.getId())).singleElement()
+			.satisfies((version) -> assertThat(version.getLabel()).isEqualTo("Backend CV"));
+		this.mvc.perform(get("/search").with(user(this.user)))
+			.andExpect(content().string(containsString("Matching jobs to your CV")))
+			.andExpect(content().string(containsString("<strong>Backend CV</strong>")))
+			.andExpect(content().string(containsString("Hide jobs that don")));
+	}
+
+	@Test
+	void aFileThatIsNotACvIsRefusedOnTheSearchPage() throws Exception {
+		MockMultipartFile fake = new MockMultipartFile("file", "cv.pdf", "application/pdf", "not a pdf".getBytes());
+
+		this.mvc.perform(multipart("/search/cv").file(fake).with(user(this.user)).with(csrf()))
+			.andExpect(redirectedUrl("/search"))
+			.andExpect(flash().attribute("error", "That file doesn't look like a real PDF"));
+		assertThat(this.cvVersions.list(this.user.getId())).isEmpty();
+	}
+
+	@Test
+	void findJobsForMyCvSearchesForTheStrongestSkillsAndCanHideLowFits() throws Exception {
+		this.skills.add(this.user.getId(), "Java");
+		this.skills.add(this.user.getId(), "Spring Boot");
+		JobSearchResult javaJob = new JobSearchResult("fixture00000005", "Junior Java Developer", "Example Logistics",
+				"Riga", List.of("Riga · Hybrid"), "https://hiringcafe.com/job/junior-java-developer-fixture00000005",
+				"Java and Spring Boot; fluent Latvian and English.", null);
+		JobSearchResult pythonJob = new JobSearchResult("fixture00000006", "Data Intern", "Sample Health", "Europe",
+				List.of("Europe · Remote"), "https://hiringcafe.com/job/data-intern-fixture00000006",
+				"Python, Django and AWS.", null);
+		given(this.jobSource.search(any(JobSearchQuery.class)))
+			.willReturn(new JobSearchPage(List.of(javaJob, pythonJob), 2));
+
+		this.mvc
+			.perform(get("/search").param("fromCv", "true")
+				.param("goodFit", "true")
+				.param("workplace", "REMOTE")
+				.with(user(this.user)))
+			.andExpect(content().string(containsString("Junior Java Developer")))
+			.andExpect(content().string(org.hamcrest.Matchers.not(containsString("Data Intern"))))
+			.andExpect(content().string(containsString("1 job on this page is hidden")))
+			.andExpect(content().string(containsString("<li>Fits my CV</li>")))
+			.andExpect(content().string(containsString(">Latvian, English</span>")));
+		ArgumentCaptor<JobSearchQuery> query = ArgumentCaptor.forClass(JobSearchQuery.class);
+		verify(this.jobSource).search(query.capture());
+		assertThat(query.getValue().keywords()).isEqualTo("Java Spring Boot");
+		assertThat(query.getValue().workplaces()).containsExactly(Workplace.REMOTE);
+	}
+
+	@Test
+	void eachResultSaysWhichLanguageItNeedsIncludingTheOneSearchedFor() throws Exception {
+		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 1));
+
+		this.mvc.perform(get("/search").param("keywords", "java").with(user(this.user)))
+			.andExpect(content().string(containsString("not stated in the summary")));
+		this.mvc.perform(get("/search").param("keywords", "java").param("languages", "Latvian").with(user(this.user)))
+			.andExpect(content().string(containsString(">Latvian</span>")));
+	}
+
+	@Test
 	void showsResultsWithATrackButton() throws Exception {
 		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 12));
 
@@ -363,7 +440,7 @@ class SearchPageIntegrationTest {
 		given(this.jobSource.search(any(JobSearchQuery.class))).willReturn(new JobSearchPage(List.of(RESULT), 1));
 
 		this.mvc.perform(get("/search").param("keywords", "java").with(user(this.user)))
-			.andExpect(content().string(containsString("Add your skills")))
+			.andExpect(content().string(containsString("Upload your CV")))
 			.andExpect(content().string(org.hamcrest.Matchers.not(containsString("fit-level"))));
 	}
 
