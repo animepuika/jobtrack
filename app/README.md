@@ -25,7 +25,14 @@ You need JDK 25 and Docker. Commands run from this `app` folder; on Windows use
 Open <http://localhost:8080> and sign in as `demo` / `demo-password`. Live
 HiringCafe search is off in the demo.
 
-**Personal use** with databases that keep your data. `docker compose up` starts both
+**Personal use, one click (Windows):** double-click `start.cmd` in the repository
+folder. It starts Docker Desktop if needed, the services below and the tracker, asks
+for a username and password the first time, and opens <http://localhost:8080> when
+the tracker is ready. Closing the window stops the tracker; `stop.cmd` stops the
+Docker services too. Nothing is deleted either way. The same from a terminal:
+`.\start.ps1` and `.\stop.ps1` in this folder.
+
+**Personal use, by hand,** with databases that keep your data. `docker compose up` starts both
 PostgreSQL databases, Azurite (the local queue) and the
 [reminder service](../reminder-service/README.md); the tracker runs from this folder:
 

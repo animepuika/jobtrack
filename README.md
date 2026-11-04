@@ -52,8 +52,11 @@ docker compose up -d --build
 ```
 
 The second command starts the tracker with fictional demo data at
-<http://localhost:8080> (sign in as `demo` / `demo-password`). For personal use,
-see [app/README.md](app/README.md#run-it).
+<http://localhost:8080> (sign in as `demo` / `demo-password`).
+
+For your own use on Windows, double-click **`start.cmd`**: it starts Docker, the
+databases and the tracker, and opens JobTrack in the browser. `stop.cmd` stops it.
+Details and the manual commands are in [app/README.md](app/README.md#run-it).
 
 ## Tests and CI
 
